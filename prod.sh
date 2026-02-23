@@ -217,6 +217,9 @@ function submit() {
         # echo ${target_dir}
         find_ini_exist_runi
         find_ini_runi
+        if [[ $ini_runi -gt $max_runi ]]; then
+            continue
+        fi
         echo "${job_name}: ini_exist_runi=$ini_exist_runi, ini_runi=$ini_runi"
         echo "submit ($job_name)"
         generate_script
