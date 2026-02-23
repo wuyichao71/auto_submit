@@ -268,7 +268,7 @@ function main() {
 
 function set_submit_parameter() {
     name_list=(__file__ queue node)
-    IFS='_' read -ra tokens <<< $(basename ${BASH_SOURCE[0]} .sh)
+    IFS='-' read -ra tokens <<< $(basename ${BASH_SOURCE[0]} .sh)
     for i in "${!name_list[@]}"
     do
         # depend on hpc
@@ -297,8 +297,8 @@ function set_config() {
     job_head="homo"
     type=$(basename $PWD | awk -F'-' '{print $NF}')
 
-    repi_ini=1
-    repi_end=20
+    repi_ini=2
+    repi_end=13
     declare -gA input
     input[n_loop]=1
     input[max_runi]=500
