@@ -120,7 +120,6 @@ function backup {
     last=${last:--1}
     ((last++))
     backup_name="backup.$last"
-    pwd
     for inpname in ${inpname_list[@]}
     do
         head=$(basename ${inpname} .inp)
