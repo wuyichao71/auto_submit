@@ -92,6 +92,9 @@ function main() {
         cd $target_dir
         find_ini_exist_runi
         find_ini_runi
+        if [[ $ini_runi -gt $max_runi ]]; then
+            continue
+        fi
         echo "$traji: $ini_exist_runi $ini_runi"
         echo "submit ($JOB_NAME)"
         if [[ "x$is_submit" == "xyes" ]]; then
@@ -124,6 +127,7 @@ ncpu=\${NSLOTS:-${DEFAULT_CPU}}
 ((mpi = ncpu / openmp))
 
 ini_runi=${ini_runi}
+max_runi=${max_runi}
 nsteps=${nsteps}
 crdout_period=${crdout_period}
 n_loop=${n_loop}
@@ -145,6 +149,9 @@ function submit_main() {
     for((i=0; i<n_loop; i++))
     do
         ((runi = ini_runi + i))
+        if [[ $runi -gt $max_runi ]]; then
+            break
+        fi
         origin_dir=$(pwd)
         target_dir="run${runi}"
         mkdir -p $target_dir
