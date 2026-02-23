@@ -12,14 +12,26 @@ function submit_config() {
         export OMP_NUM_THREADS=1
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12-serine
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12-serine.sh
-    elif [[ ${HOSTNAME} == cell ]]; then
-        mpi=$(nproc)
+    elif [[ -n "${QUEUE}" ]] && [[ ${QUEUE} == all.q ]]; then
+        module purge
+        module load intel/2024.0.2 intel-mpi/2021.11 cuda/12.3.2
+        spdyn="/home/2/uj02562/data/software/genesis-2.1.4/bin/spdyn-intel-mixed-cuda12"
         export OMP_NUM_THREADS=1
+        openmp=${OMP_NUM_THREADS}
+        ncpu=${NSLOTS}
+        ((mpi = ncpu / openmp))
+    elif [[ ${HOSTNAME} == cell ]]; then
+        export OMP_NUM_THREADS=1
+        openmp=${OMP_NUM_THREADS}
+        ncpu=$(nproc)
+        ((mpi = ncpu / openmp:))
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
     else
-        mpi=${NSLOTS}
         export OMP_NUM_THREADS=1
+        openmp=${OMP_NUM_THREADS}
+        ncpu=${NSLOTS}
+        ((mpi = ncpu / openmp:))
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
     fi
@@ -108,14 +120,15 @@ function backup {
     last=${last:--1}
     ((last++))
     backup_name="backup.$last"
+    pwd
     for inpname in ${inpname_list[@]}
     do
         head=$(basename ${inpname} .inp)
         dcd=${head}${runi}.dcd
         rst=${head}${runi}.rst
         out=${head}
-        [[ -e $dcd ]] && mkdir -p ${backup_name} && mv ${rst} ${backup_name}
-        [[ -e $rst ]] && mkdir -p ${backup_name} && mv ${dcd} ${backup_name}
+        [[ -e $dcd ]] && mkdir -p ${backup_name} && mv ${dcd} ${backup_name}
+        [[ -e $rst ]] && mkdir -p ${backup_name} && mv ${rst} ${backup_name}
         [[ -d ${out} ]] && mkdir -p ${backup_name} && mv ${out} ${backup_name}
     done
 }
@@ -134,7 +147,7 @@ function get_job_name() {
     job_name_list=()
     # depend on hpc
     # helix kinase
-    if [[ $queue =~ (helix|kinase) ]]; then
+    if [[ $queue =~ (helix|kinase|gpu_.|node_.) ]]; then
         jobid_list=$(qstat | awk -v user=$(whoami) '$4==user {print $1}')
         for jobid in ${jobid_list}
         do
@@ -247,6 +260,8 @@ function submit_repi() {
         bash ${script}
     elif [[ ${queue} =~ (beta|serine) ]]; then
         sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}
+    elif [[ ${queue} =~ (gpu|node)_. ]]; then
+        qsub -cwd -l "h_rt=24:00:00" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} ${script}
     fi
 }
 
@@ -296,9 +311,8 @@ function set_config() {
 
     job_head="homo"
     type=$(basename $PWD | awk -F'-' '{print $NF}')
-
-    repi_ini=2
-    repi_end=13
+    repi_ini=15
+    repi_end=15
     declare -gA input
     input[n_loop]=1
     input[max_runi]=500
