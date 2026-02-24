@@ -35,7 +35,6 @@ function submit_config() {
         if [ ! -z "${PBS_O_WORKDIR}" ]; then
           cd ${PBS_O_WORKDIR}
         fi
-        # mpiexec=mpirun
         module -s purge
         module -s load genesis/2.1.4
         spdyn=spdyn
@@ -53,7 +52,7 @@ function submit_config() {
         printenv
         export OMP_NUM_THREADS=1
         openmp=${OMP_NUM_THREADS}
-        ncpu=${NSLOTS}
+        ncpu=${NSLOTS:-$(nproc)}
         ((mpi = ncpu / openmp))
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
@@ -292,7 +291,9 @@ EOF
 function submit_repi() {
     # helix kinase
     if [[ ${queue} =~ (helix|kinase) ]]; then
-        qsub -cwd -pe mpi ${node} -q ${queue} -e ${log} -o ${log} -N ${job_name} ${script}
+        cmd="qsub -cwd -pe mpi ${node} -q ${queue} -e ${log} -o ${log} -N ${job_name} ${script}"
+        echo $cmd
+        eval $cmd
     elif [[ ${queue} == cell ]]; then
         echo "qsub -cwd -pe mpi ${node} -q ${queue} -e ${log} -o ${log} -N ${job_name} ${script}"
         echo "sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}"
@@ -302,19 +303,24 @@ function submit_repi() {
     elif [[ ${queue} =~ (gpu|node)_. ]]; then
         qsub -cwd -l "h_rt=24:00:00" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} ${script}
     elif [[ ${queue} == ims ]]; then
-        jsub -l "select=1:ncpus=${node}:mpiprocs=${node}:ompthreads=1" -l "walltime=00:02:00" -N ${job_name} -v log=${log} ${script}
+        ((mpi = node * mpi_per_node))
+        cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=1' -l 'walltime=${time}' -N ${job_name} -v log=${log} ${script}"
+        echo $cmd
+        eval $cmd
     elif [[ ${queue} == small ]]; then
-        pjsub -L "rscgrp=${queue}" \
-        -L "rscunit=rscunit_ft01" \
-        -L "node=${node}" \
-        --mpi "max-proc-per-node=16" \
+        cmd="pjsub -L 'rscgrp=${queue}' \
+        -L 'rscunit=rscunit_ft01' \
+        -L 'node=${node}' \
+        --mpi 'max-proc-per-node=${mpi_per_node}' \
         -g $(groups | awk '{print $NF}') \
-        -L "elapse=00:05:00" \
-        -x "PJM_LLIO_GFSCACHE=/vol0004:/vol0005:/vol0003" \
+        -L 'elapse=00:05:00' \
+        -x 'PJM_LLIO_GFSCACHE=/vol0004:/vol0005:/vol0003' \
         -N ${job_name} \
         -o ${log} \
         -e ${log} \
-        ${script}
+        ${script}"
+        echo $cmd
+        eval $cmd
     fi
 }
 
@@ -335,7 +341,7 @@ function main() {
 }
 
 function set_submit_parameter() {
-    name_list=(__file__ queue node)
+    name_list=(__file__ queue node mpi_per_node time)
     IFS='-' read -ra tokens <<< $(basename ${BASH_SOURCE[0]} .sh)
     for i in "${!name_list[@]}"
     do
