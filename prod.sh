@@ -313,7 +313,7 @@ function submit_repi() {
         -L 'node=${node}' \
         --mpi 'max-proc-per-node=${mpi_per_node}' \
         -g $(groups | awk '{print $NF}') \
-        -L 'elapse=00:05:00' \
+        -L 'elapse=${time}' \
         -x 'PJM_LLIO_GFSCACHE=/vol0004:/vol0005:/vol0003' \
         -N ${job_name} \
         -o ${log} \
