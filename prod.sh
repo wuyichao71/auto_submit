@@ -163,18 +163,28 @@ function get_job_name() {
 function find_ini_exist_runi() {
     ini_exist_runi=0
     run_dir="run${ini_exist_runi}"
-    [[ -d $run_dir ]] || return
-    while true
+    is_runned=false
+    while [[ ${ini_exist_runi} -le ${max_runi} ]]
     do
-        run_dir="run${ini_exist_runi}"
-        [[ -d $run_dir ]] && break
+        is_rst_exist=true
+        for inpname in ${inpname_list[@]}
+        do
+            run_dir="run${ini_exist_runi}"
+            head=$(basename ${inpname} .inp)
+            rst=${run_dir}/${head}${ini_runi}.rst
+            [[ -e ${rst} ]] && full_rst ${rst} || is_rst_exist=false
+        done
+        [[ ${is_rst_exist} == true ]] && { is_runned=true; break; }
         ((ini_exist_runi++))
     done
+    if [[ ${is_runned} == false ]]; then
+        ini_exist_runi=0
+    fi
 }
 
 function find_ini_runi() {
     ini_runi=0
-    for inpname in ${inpname_list[@]}
+    for inpname in "${inpname_list[@]}"
     do
         run_dir="run${ini_runi}"
         head=$(basename ${inpname} .inp)
@@ -198,7 +208,7 @@ function find_ini_runi() {
             full_out ${out} || { is_break=true; break; }
             full_rst ${rst} || { is_break=true; break; }
         done
-        [[ ${is_break} == true ]] && break
+        [[ "${is_break}" == true ]] && break
         ((ini_runi++))
     done
 }
@@ -212,12 +222,10 @@ function submit() {
         job_name="${job_head}-${type}-${repi}"
 
         is_run && continue
-
         cd ${target_dir}
-        # echo ${target_dir}
         find_ini_exist_runi
         find_ini_runi
-        if [[ $ini_runi -gt $max_runi ]]; then
+        if [[ $ini_runi -gt ${input[max_runi]} ]]; then
             continue
         fi
         echo "${job_name}: ini_exist_runi=$ini_exist_runi, ini_runi=$ini_runi"
@@ -314,7 +322,7 @@ function set_config() {
 
     job_head="homo"
     type=$(basename $PWD | awk -F'-' '{print $NF}')
-    repi_ini=16
+    repi_ini=1
     repi_end=20
     declare -gA input
     input[n_loop]=2
