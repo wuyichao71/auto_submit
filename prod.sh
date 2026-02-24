@@ -111,7 +111,7 @@ function run_program {
     do
         head=$(basename ${inpname} .inp)
         echo "Run ${target_dir}/${inpname}"
-        if [[ x"$PJM_RSCGRP" == "xsmall" ]]; then
+        if [[ "x$PJM_RSCGRP" == "xsmall" ]]; then
             ${mpiexec} -np $mpi -stdout-proc ${head}/out -stderr-proc ${head}/err $spdyn ${inpname}
         else
             mkdir -p "${head}"
