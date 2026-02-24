@@ -30,8 +30,7 @@ function submit_config() {
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
     elif [[ ${PBS_O_HOST} == ccpbs* ]]; then
         openmp=${OMP_NUM_THREADS}
-        ncpu=${NCPUS}
-        ((mpi = ncpu / openmp))
+        mpi=$(wc -l < "${PBS_NODEFILE}")
         if [ ! -z "${PBS_O_WORKDIR}" ]; then
           cd ${PBS_O_WORKDIR}
         fi
@@ -112,10 +111,14 @@ function run_program {
         head=$(basename ${inpname} .inp)
         echo "Run ${target_dir}/${inpname}"
         if [[ "x$PJM_RSCGRP" == "xsmall" ]]; then
-            ${mpiexec} -np $mpi -stdout-proc ${head}/out -stderr-proc ${head}/err $spdyn ${inpname}
+            cmd="${mpiexec} -np $mpi -stdout-proc ${head}/out -stderr-proc ${head}/err $spdyn ${inpname}"
+            echo "${cmd}"
+            eval "${cmd}"
         else
             mkdir -p "${head}"
-            ${mpiexec} -np ${mpi} $spdyn ${inpname} >${head}/out.1.0
+            cmd="${mpiexec} -np ${mpi} $spdyn ${inpname} >${head}/out.1.0"
+            echo "${cmd}"
+            eval "${cmd}"
         fi
     done
 }
@@ -303,11 +306,12 @@ function submit_repi() {
     elif [[ ${queue} =~ (gpu|node)_. ]]; then
         qsub -cwd -l "h_rt=24:00:00" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} ${script}
     elif [[ ${queue} == ims ]]; then
-        ((mpi = node * mpi_per_node))
-        cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=1' -l 'walltime=${time}' -N ${job_name} -v log=${log} ${script}"
+        ((mpi = node / omp))
+        cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}' -l 'walltime=${time}' -N ${job_name} -v log=${log} ${script}"
         echo $cmd
         eval $cmd
     elif [[ ${queue} == small ]]; then
+        (mpi_per_node = 48 / omp)
         cmd="pjsub -L 'rscgrp=${queue}' \
         -L 'rscunit=rscunit_ft01' \
         -L 'node=${node}' \
@@ -341,7 +345,7 @@ function main() {
 }
 
 function set_submit_parameter() {
-    name_list=(__file__ queue node mpi_per_node time)
+    name_list=(__file__ queue node omp time)
     IFS='-' read -ra tokens <<< $(basename ${BASH_SOURCE[0]} .sh)
     for i in "${!name_list[@]}"
     do
