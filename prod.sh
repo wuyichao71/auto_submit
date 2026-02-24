@@ -3,28 +3,31 @@
 #################################################
 function submit_config() {
     mpiexec=mpiexec
+    # beta
     if [[ "x${SLURMD_NODENAME}" == "xbeta" ]]; then
         mpi=24
         export OMP_NUM_THREADS=1
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12-beta
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
+    # serine
     elif [[ "x${SLURMD_NODENAME}" == "xserine" ]]; then
         mpi=24
         export OMP_NUM_THREADS=1
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12-serine
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12-serine.sh
-    elif [[ "x${QUEUE}" == "all.q" ]]; then
+    # tsubame
+    elif [[ "x${QUEUE}" == "xall.q" ]]; then
+        ncpu=$(nproc)
         module purge
         module load intel/2024.0.2 intel-mpi/2021.11 cuda/12.3.2
         spdyn="/home/2/uj02562/data/software/genesis-2.1.4/bin/spdyn-intel-mixed-cuda12"
-        export OMP_NUM_THREADS=1
+        export OMP_NUM_THREADS=${omp}
         openmp=${OMP_NUM_THREADS}
-        ncpu=${NSLOTS}
         ((mpi = ncpu / openmp))
     elif [[ ${HOSTNAME} == cell ]]; then
+        ncpu=$(nproc)
         export OMP_NUM_THREADS=1
         openmp=${OMP_NUM_THREADS}
-        ncpu=$(nproc)
         ((mpi = ncpu / openmp))
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
@@ -40,7 +43,7 @@ function submit_config() {
     elif [[ ${PJM_RSCGRP} == small ]]; then
         export PLE_MPI_STD_EMPTYFILE=off
         export OMP_NUM_THREADS=$((PJM_NODE * $(nproc) / PJM_MPI_PROC))
-        # echo "OMP_NUM_THREADS=${OMP_NUM_THREADS}"
+        echo "OMP_NUM_THREADS=${OMP_NUM_THREADS}"
         # bindir=/vol0004/hp150272/data/u12262/genesis-2.1.2/bin
         # spdyn=$bindir/spdyn_fj_mixed
         mpi=${PJM_MPI_PROC:-16}
@@ -49,9 +52,9 @@ function submit_config() {
         spdyn=spdyn
     else
         printenv
+        ncpu=${NSLOTS:-$(nproc)}
         export OMP_NUM_THREADS=1
         openmp=${OMP_NUM_THREADS}
-        ncpu=${NSLOTS:-$(nproc)}
         ((mpi = ncpu / openmp))
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
@@ -303,8 +306,9 @@ function submit_repi() {
         bash ${script}
     elif [[ ${queue} =~ (beta|serine) ]]; then
         sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}
+    # tsubame
     elif [[ ${queue} =~ (gpu|node)_. ]]; then
-        qsub -cwd -l "h_rt=24:00:00" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} ${script}
+        qsub -cwd -l "h_rt=${time}" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} -v "omp=${omp}" ${script}
     elif [[ ${queue} == ims ]]; then
         ((mpi = node / omp))
         cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}' -l 'walltime=${time}' -N ${job_name} -v log=${log} ${script}"
@@ -374,8 +378,8 @@ function set_config() {
 
     job_head="homo"
     type=$(basename $PWD | awk -F'-' '{print $NF}')
-    repi_ini=1
-    repi_end=1
+    repi_ini=15
+    repi_end=20
     declare -gA input
     input[n_loop]=2
     input[max_runi]=500
