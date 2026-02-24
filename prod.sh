@@ -3,17 +3,17 @@
 #################################################
 function submit_config() {
     mpiexec=mpiexec
-    if [[ -n "${SLURMD_NODENAME}" ]] && [[ ${SLURMD_NODENAME} == beta ]]; then
+    if [[ "x${SLURMD_NODENAME}" == "xbeta" ]]; then
         mpi=24
         export OMP_NUM_THREADS=1
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12-beta
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
-    elif [[ -n "${SLURMD_NODENAME}" ]] && [[ ${SLURMD_NODENAME} == serine ]]; then
+    elif [[ "x${SLURMD_NODENAME}" == "xserine" ]]; then
         mpi=24
         export OMP_NUM_THREADS=1
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12-serine
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12-serine.sh
-    elif [[ -n "${QUEUE}" ]] && [[ ${QUEUE} == all.q ]]; then
+    elif [[ "x${QUEUE}" == "all.q" ]]; then
         module purge
         module load intel/2024.0.2 intel-mpi/2021.11 cuda/12.3.2
         spdyn="/home/2/uj02562/data/software/genesis-2.1.4/bin/spdyn-intel-mixed-cuda12"
@@ -35,16 +35,26 @@ function submit_config() {
         if [ ! -z "${PBS_O_WORKDIR}" ]; then
           cd ${PBS_O_WORKDIR}
         fi
-
         # mpiexec=mpirun
         module -s purge
         module -s load genesis/2.1.4
         spdyn=spdyn
+    elif [[ ${PJM_RSCGRP} == small ]]; then
+        export PLE_MPI_STD_EMPTYFILE=off
+        export OMP_NUM_THREADS=$((PJM_NODE * $(nproc) / PJM_MPI_PROC))
+        # echo "OMP_NUM_THREADS=${OMP_NUM_THREADS}"
+        # bindir=/vol0004/hp150272/data/u12262/genesis-2.1.2/bin
+        # spdyn=$bindir/spdyn_fj_mixed
+        mpi=${PJM_MPI_PROC:-16}
+        source /vol0004/apps/oss/spack/share/spack/setup-env.sh
+        spack load /46ohljh # genesis#2.1.6.1 mixed
+        spdyn=spdyn
     else
+        printenv
         export OMP_NUM_THREADS=1
         openmp=${OMP_NUM_THREADS}
         ncpu=${NSLOTS}
-        ((mpi = ncpu / openmp:))
+        ((mpi = ncpu / openmp))
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
     fi
@@ -102,8 +112,12 @@ function run_program {
     do
         head=$(basename ${inpname} .inp)
         echo "Run ${target_dir}/${inpname}"
-        mkdir -p ${head}
-        ${mpiexec} -np ${mpi} $spdyn ${inpname} >${head}/out.1.0
+        if [[ x"$PJM_RSCGRP" == "xsmall" ]]; then
+            ${mpiexec} -np $mpi -stdout-proc ${head}/out -stderr-proc ${head}/err $spdyn ${inpname}
+        else
+            mkdir -p "${head}"
+            ${mpiexec} -np ${mpi} $spdyn ${inpname} >${head}/out.1.0
+        fi
     done
 }
 
@@ -289,6 +303,18 @@ function submit_repi() {
         qsub -cwd -l "h_rt=24:00:00" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} ${script}
     elif [[ ${queue} == ims ]]; then
         jsub -l "select=1:ncpus=${node}:mpiprocs=${node}:ompthreads=1" -l "walltime=00:02:00" -N ${job_name} -v log=${log} ${script}
+    elif [[ ${queue} == small ]]; then
+        pjsub -L "rscgrp=${queue}" \
+        -L "rscunit=rscunit_ft01" \
+        -L "node=${node}" \
+        --mpi "max-proc-per-node=16" \
+        -g $(groups | awk '{print $NF}') \
+        -L "elapse=00:05:00" \
+        -x "PJM_LLIO_GFSCACHE=/vol0004:/vol0005:/vol0003" \
+        -N ${job_name} \
+        -o ${log} \
+        -e ${log} \
+        ${script}
     fi
 }
 
