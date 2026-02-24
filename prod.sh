@@ -43,13 +43,11 @@ function submit_config() {
     elif [[ ${PJM_RSCGRP} == small ]]; then
         export PLE_MPI_STD_EMPTYFILE=off
         export OMP_NUM_THREADS=$((PJM_NODE * $(nproc) / PJM_MPI_PROC))
-        echo "OMP_NUM_THREADS=${OMP_NUM_THREADS}"
-        # bindir=/vol0004/hp150272/data/u12262/genesis-2.1.2/bin
-        # spdyn=$bindir/spdyn_fj_mixed
         mpi=${PJM_MPI_PROC:-16}
+        spdyn=/vol0003/mdt0/data/hp250059/u12262/software/genesis-2.1.6.1/bin/spdyn-fj-mixed
         source /vol0004/apps/oss/spack/share/spack/setup-env.sh
         spack load /46ohljh # genesis#2.1.6.1 mixed
-        spdyn=spdyn
+        # spdyn=spdyn
     else
         printenv
         ncpu=${NSLOTS:-$(nproc)}
