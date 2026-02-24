@@ -31,15 +31,15 @@ function submit_config() {
         ((mpi = ncpu / openmp))
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
+    #ims
     elif [[ ${PBS_O_HOST} == ccpbs* ]]; then
         openmp=${OMP_NUM_THREADS}
         mpi=$(wc -l < "${PBS_NODEFILE}")
         if [ ! -z "${PBS_O_WORKDIR}" ]; then
           cd ${PBS_O_WORKDIR}
         fi
-        module -s purge
-        module -s load genesis/2.1.4
-        spdyn=spdyn
+        source ~/software/genesis-2.1.6.1/setup-mixed-ims.sh
+        spdyn=/lustre/home/users/fen/software/genesis-2.1.6.1/bin/spdyn-mixed-ims
     elif [[ ${PJM_RSCGRP} == small ]]; then
         export PLE_MPI_STD_EMPTYFILE=off
         export OMP_NUM_THREADS=$((PJM_NODE * $(nproc) / PJM_MPI_PROC))
@@ -188,6 +188,9 @@ function get_job_name() {
     # beta serine
     elif [[ $queue =~ (beta|serine) ]]; then
         job_name_list=($(squeue -o '%j' | tail -n+2))
+    # ims
+    elif [[ $queue =~ ims ]]; then
+        job_name_list=($(jobinfo -c |grep -v '^[-Q]' |awk '{print $3}'))
     fi
     echo "${job_name_list[@]}"
 }
