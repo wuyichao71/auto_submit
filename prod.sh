@@ -76,7 +76,7 @@ function generate_inp() {
         out_rstfile=${head}${runi}.rst
         rstfile=""
         if [[ ${runi} -ne 0 ]]; then
-            rstfile="rstfile = ${head}${prev_runi}.rst"
+            rstfile="rstfile = ../run${prev_runi}/${head}${prev_runi}.rst"
         fi
         
         eval "echo \"${template_list[idx]}\"" >${inpname}
@@ -237,6 +237,7 @@ function generate_script() {
     script=$(eval "echo ${submit_dir}/${submit_name}")
     cat >${script} <<EOF
 #!/usr/bin/env bash
+ini_runi=${ini_runi}
 $(declare -p input)
 $(declare -p inpname_list)
 $(declare -p template_list)
@@ -310,10 +311,10 @@ function set_config() {
 
     job_head="homo"
     type=$(basename $PWD | awk -F'-' '{print $NF}')
-    repi_ini=15
-    repi_end=15
+    repi_ini=16
+    repi_end=20
     declare -gA input
-    input[n_loop]=1
+    input[n_loop]=2
     input[max_runi]=500
     input[psffile]=../data/step3_input.psf
     input[pdbfile]=../data/initial_equ.pdb
