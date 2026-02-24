@@ -36,9 +36,10 @@ function submit_config() {
           cd ${PBS_O_WORKDIR}
         fi
 
-        mpiexec=mpirun
+        # mpiexec=mpirun
         module -s purge
         module -s load genesis/2.1.4
+        spdyn=spdyn
     else
         export OMP_NUM_THREADS=1
         openmp=${OMP_NUM_THREADS}
