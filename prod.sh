@@ -44,10 +44,10 @@ function submit_config() {
         export PLE_MPI_STD_EMPTYFILE=off
         export OMP_NUM_THREADS=$((PJM_NODE * $(nproc) / PJM_MPI_PROC))
         mpi=${PJM_MPI_PROC:-16}
-        spdyn=/vol0003/mdt0/data/hp250059/u12262/software/genesis-2.1.6.1/bin/spdyn-fj-mixed
+        # spdyn=/vol0003/mdt0/data/hp250059/u12262/software/genesis-2.1.6.1/bin/spdyn-fj-mixed
         source /vol0004/apps/oss/spack/share/spack/setup-env.sh
         spack load /46ohljh # genesis#2.1.6.1 mixed
-        # spdyn=spdyn
+        spdyn=spdyn
     else
         printenv
         ncpu=${NSLOTS:-$(nproc)}
@@ -376,10 +376,10 @@ function set_config() {
 
     job_head="homo"
     type=$(basename $PWD | awk -F'-' '{print $NF}')
-    repi_ini=15
-    repi_end=20
+    repi_ini=1
+    repi_end=2
     declare -gA input
-    input[n_loop]=2
+    input[n_loop]=1
     input[max_runi]=500
     input[psffile]=../data/step3_input.psf
     input[pdbfile]=../data/initial_equ.pdb
