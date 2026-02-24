@@ -135,6 +135,8 @@ function full_rst() {
 }
 
 function full_dcd() {
+    size=$(stat -c%s $1)
+    [[ $size -eq 0 ]] && return 1
     nframes=$(od -An -j 8 -N 4 -t d4 $1)
     ntitle=$(od -An -j 96 -N 4 -t d4 $1)
     ((nheader = 108 + ntitle * 80))
@@ -466,7 +468,10 @@ ${restraints}
 EOF
 )"
     )
-    [[ -f .env ]] && set -a && source .env && set +a
+    [[ -f env ]] && set -a && source env && set +a
+    [[ -f env.${queue} ]] && set -a && source env.${queue} && set +a
+    echo "repi_ini=${repi_ini}, repi_end=${repi_end}"
+    echo "input[n_loop]=${input[n_loop]}"
 }
 
 #################################################
