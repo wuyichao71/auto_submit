@@ -311,7 +311,7 @@ function submit_repi() {
         echo $cmd
         eval $cmd
     elif [[ ${queue} == small ]]; then
-        (mpi_per_node = 48 / omp)
+        ((mpi_per_node = 48 / omp))
         cmd="pjsub -L 'rscgrp=${queue}' \
         -L 'rscunit=rscunit_ft01' \
         -L 'node=${node}' \
