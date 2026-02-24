@@ -2,6 +2,7 @@
 
 #################################################
 function submit_config() {
+    mpiexec=mpiexec
     if [[ -n "${SLURMD_NODENAME}" ]] && [[ ${SLURMD_NODENAME} == beta ]]; then
         mpi=24
         export OMP_NUM_THREADS=1
@@ -24,9 +25,20 @@ function submit_config() {
         export OMP_NUM_THREADS=1
         openmp=${OMP_NUM_THREADS}
         ncpu=$(nproc)
-        ((mpi = ncpu / openmp:))
+        ((mpi = ncpu / openmp))
         spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
+    elif [[ ${PBS_O_HOST} == ccpbs* ]]; then
+        openmp=${OMP_NUM_THREADS}
+        ncpu=${NCPUS}
+        ((mpi = ncpu / openmp))
+        if [ ! -z "${PBS_O_WORKDIR}" ]; then
+          cd ${PBS_O_WORKDIR}
+        fi
+
+        mpiexec=mpirun
+        module -s purge
+        module -s load genesis/2.1.4
     else
         export OMP_NUM_THREADS=1
         openmp=${OMP_NUM_THREADS}
@@ -90,7 +102,7 @@ function run_program {
         head=$(basename ${inpname} .inp)
         echo "Run ${target_dir}/${inpname}"
         mkdir -p ${head}
-        mpiexec -np ${mpi} $spdyn ${inpname} >${head}/out.1.0
+        ${mpiexec} -np ${mpi} $spdyn ${inpname} >${head}/out.1.0
     done
 }
 
@@ -247,7 +259,8 @@ function generate_script() {
     ((runi_end=runi_ini+input[n_loop]-1))
     script=$(eval "echo ${submit_dir}/${submit_name}")
     cat >${script} <<EOF
-#!/usr/bin/env bash
+#!/bin/sh
+#PBS -j oe
 ini_runi=${ini_runi}
 $(declare -p input)
 $(declare -p inpname_list)
@@ -273,6 +286,8 @@ function submit_repi() {
         sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}
     elif [[ ${queue} =~ (gpu|node)_. ]]; then
         qsub -cwd -l "h_rt=24:00:00" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} ${script}
+    elif [[ ${queue} == ims ]]; then
+        jsub -l "select=1:ncpus=${node}:mpiprocs=${node}:ompthreads=1" -l "walltime=00:02:00" -N ${job_name} -v log=${log} ${script}
     fi
 }
 
@@ -323,7 +338,7 @@ function set_config() {
     job_head="homo"
     type=$(basename $PWD | awk -F'-' '{print $NF}')
     repi_ini=1
-    repi_end=20
+    repi_end=1
     declare -gA input
     input[n_loop]=2
     input[max_runi]=500
