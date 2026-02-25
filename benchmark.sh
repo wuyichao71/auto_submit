@@ -18,9 +18,8 @@ function main() {
     do
         # 1. get gpu card number
         gpu=$(extract '# of GPUs' $file)
-
         # 2. if on tsubame, set queue dependent on gpu card type and gpu card number
-        if [[ "x$HOSTNAME" == xlogin* ]]; then
+        if [[ "x$HOSTNAME" == "xlogin"* ]]; then
             gpu_model="$(grep 'gpu model' $file)"
             if [[ "x${gpu_model}" == "x"*"NVIDIA H100 MIG 3g.47gb (CC 9.0)"* ]]; then
                 queue="node_o"
@@ -31,6 +30,10 @@ function main() {
                     queue="node_h"
                 fi
             fi
+        elif [[ "x$HOSTNAME" == "xcell" ]]; then
+            queue=$(extract 'exec. host' $file)
+            queue=${queue#*@}
+            queue=${queue%.*}
         fi
 
         # if gpu is empty, set to zero
