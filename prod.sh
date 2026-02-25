@@ -285,7 +285,7 @@ function generate_script() {
     ((runi_end=runi_ini+input[n_loop]-1))
     script=$(eval "echo ${submit_dir}/${submit_name}")
     cat >${script} <<EOF
-#!/bin/sh
+#!/usr/bin/env bash
 #PBS -j oe
 ini_runi=${ini_runi}
 $(declare -p input)
