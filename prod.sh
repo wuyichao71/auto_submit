@@ -325,22 +325,26 @@ function submit_repi() {
         qsub -cwd -l "h_rt=${time}" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} -v "omp=${omp}" ${script}
     elif [[ ${queue} == ims ]]; then
         ((mpi = node / omp))
-        cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}' -l 'walltime=${time}' -N ${job_name} -v log=${log} ${script}"
+        cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}' \
+            -N ${job_name} \
+            -l 'walltime=${time}' \
+            -v log=${log} \
+            ${script}"
         echo $cmd
         eval $cmd
     elif [[ ${queue} == small ]]; then
         ((mpi_per_node = 48 / omp))
         cmd="pjsub -L 'rscgrp=${queue}' \
-        -L 'rscunit=rscunit_ft01' \
-        -L 'node=${node}' \
-        --mpi 'max-proc-per-node=${mpi_per_node}' \
-        -g $(groups | awk '{print $NF}') \
-        -L 'elapse=${time}' \
-        -x 'PJM_LLIO_GFSCACHE=/vol0004:/vol0005:/vol0003' \
-        -N ${job_name} \
-        -o ${log} \
-        -e ${log} \
-        ${script}"
+            -L 'rscunit=rscunit_ft01' \
+            -L 'node=${node}' \
+            --mpi 'max-proc-per-node=${mpi_per_node}' \
+            -g $(groups | awk '{print $NF}') \
+            -L 'elapse=${time}' \
+            -x 'PJM_LLIO_GFSCACHE=/vol0004:/vol0005:/vol0003' \
+            -N ${job_name} \
+            -o ${log} \
+            -e ${log} \
+            ${script}"
         echo $cmd
         eval $cmd
     fi
