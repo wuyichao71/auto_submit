@@ -484,10 +484,11 @@ ${restraints}
 EOF
 )"
     )
-    [[ -f env ]] && set -a && source env && set +a
-    [[ -f env.${queue} ]] && set -a && source env.${queue} && set +a
+    [[ -f para ]] && set -a && source para && set +a
+    [[ -f para.${queue} ]] && set -a && source para.${queue} && set +a
     if [[ $1 =~ [0-9]+ ]]; then
         repi_ini=$1
+        repi_end=$1
     fi
     if [[ $2 =~ [0-9]+ ]]; then
         repi_end=$2
