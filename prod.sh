@@ -168,7 +168,7 @@ function backup {
 
 function rename_output() {
     # recover output/out.1.0
-    [[ -e ${head}/out.${mpi_idx}.0 ]] && ! [[ -e ${head}/err.1.0 ]] && mv ${head}/out.${mpi_idx}.0 ${head}/out.1.0
+    [[ -e ${head}/out.${mpi_idx}.0 ]] && ! [[ -e ${head}/out.1.0 ]] && mv ${head}/out.${mpi_idx}.0 ${head}/out.1.0
 }
 #################################################
 
@@ -357,8 +357,13 @@ function setup_directory() {
 
 # main function
 function main() {
-    set_config
-    submit $1
+    set_config "$@"
+    if [[ $# -eq 0 ]]; then
+        is_submit=no
+    else
+        is_submit=${!#}
+    fi
+    submit $is_submit
 }
 
 function set_submit_parameter() {
@@ -481,6 +486,12 @@ EOF
     )
     [[ -f env ]] && set -a && source env && set +a
     [[ -f env.${queue} ]] && set -a && source env.${queue} && set +a
+    if [[ $1 =~ [0-9]+ ]]; then
+        repi_ini=$1
+    fi
+    if [[ $2 =~ [0-9]+ ]]; then
+        repi_end=$2
+    fi
     echo "repi_ini=${repi_ini}, repi_end=${repi_end}"
     echo "input[n_loop]=${input[n_loop]}"
     setup_directory

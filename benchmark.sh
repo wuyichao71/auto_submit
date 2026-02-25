@@ -38,8 +38,10 @@ function main() {
     done
     for key in "${!time_sum[@]}"
     do
-        time[$key]=$(bc <<<"scale=3; ${time_sum[$key]} / ${count[$key]}")
-        echo "${key},time_sum=${time_sum[$key]},count=${count[$key]},time=${time[$key]}"
+        time=$(bc <<<"scale=3; ${time_sum[$key]} / ${count[$key]}")
+        hour=$(bc <<<"scale=1; ${time} / 3600")
+        ns=$(bc <<<"scale=1; 0.0035 * 600000 * 24 * 3600 / ${time} / 1000")
+        echo "${key},time_sum=${time_sum[$key]},count=${count[$key]},time=${time},hour=${hour},ns/day=${ns},"
     done
 
 }
