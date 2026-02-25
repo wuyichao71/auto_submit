@@ -16,11 +16,13 @@ function main() {
     declare -A count
     for file in $(ls -hv */run*/prod/out.1.0)
     do
-        gpu_model="$(grep 'gpu model' $file)"
-        if [[ "x${gpu_model}" == "x"*"NVIDIA H100 (CC 9.0)"* ]]; then
-            queue="node_q"
-        elif [[ "x${gpu_model}" == "x"*"NVIDIA H100 MIG 3g.47gb (CC 9.0)"* ]]; then
-            queue="node_o"
+        if [[ "x$HOSTNAME" == xlogin* ]]; then
+            gpu_model="$(grep 'gpu model' $file)"
+            if [[ "x${gpu_model}" == "x"*"NVIDIA H100 (CC 9.0)"* ]]; then
+                queue="node_q"
+            elif [[ "x${gpu_model}" == "x"*"NVIDIA H100 MIG 3g.47gb (CC 9.0)"* ]]; then
+                queue="node_o"
+            fi
         fi
         gpu=$(extract '# of GPUs' $file)
         gpu=${gpu:-0}
