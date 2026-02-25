@@ -191,6 +191,9 @@ function get_job_name() {
     # ims
     elif [[ $queue =~ ims ]]; then
         job_name_list=($(jobinfo -c |grep -v '^[-Q]' |awk '{print $3}'))
+    # fugaku
+    elif [[ $queue =~ (small) ]]; then
+        job_name_list=($(pjstat --data |grep '^,' |awk -F, '{print $3}'))
     fi
     echo "${job_name_list[@]}"
 }
@@ -339,7 +342,6 @@ function setup_directory() {
     mkdir -p $(seq $repi_ini $repi_end)
     for repi in $(seq $repi_ini $repi_end)
     do
-
         [[ -e ${repi}/data ]] || ln -snT ../../../data/${job_head}-${type} ${repi}/data
         [[ -e ${repi}/toppar ]] || ln -snT ../../../data/${job_head}-${type}/toppar ${repi}/toppar
     done
@@ -402,8 +404,6 @@ EOF
 )
     input[group]=$(grep '^group' ../../data/homo-${type}/step4.1_equilibration.inp)
     input[initial_restraints]=$(sed -n '/^\[RESTRAINTS\]/,$p' ../../data/homo-${type}/step4.1_equilibration.inp)
-
-    setup_directory
 
     template_list=(
 "$(cat <<'EOF'
@@ -475,6 +475,7 @@ EOF
     [[ -f env.${queue} ]] && set -a && source env.${queue} && set +a
     echo "repi_ini=${repi_ini}, repi_end=${repi_end}"
     echo "input[n_loop]=${input[n_loop]}"
+    setup_directory
 }
 
 #################################################
