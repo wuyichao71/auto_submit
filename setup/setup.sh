@@ -5,7 +5,7 @@ if [[ $name == *ims* ]]; then
     module -s load mkl/2025.0.0.1
     module -s load intelmpi/2021.14.1
     if [[ $name == *cuda12* ]]; then
-        module -s load cuda/12.8u1
+        module -s load cuda/12.6u2
     fi
 else
     if [[ $name == *intel* ]]; then
