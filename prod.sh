@@ -44,7 +44,6 @@ function submit_config() {
         export PLE_MPI_STD_EMPTYFILE=off
         export OMP_NUM_THREADS=$((PJM_NODE * $(nproc) / PJM_MPI_PROC))
         mpi=${PJM_MPI_PROC:-16}
-        # spdyn=/vol0003/mdt0/data/hp250059/u12262/software/genesis-2.1.6.1/bin/spdyn-fj-mixed
         source /vol0004/apps/oss/spack/share/spack/setup-env.sh
         spack load /46ohljh # genesis#2.1.6.1 mixed
         spdyn=spdyn
@@ -65,6 +64,7 @@ function submit_config() {
 
 function submit_main() {
     submit_config
+    mpi_idx=0
     for((i=0; i<n_loop; i++))
     do
         ((runi = ini_runi + i))
@@ -112,9 +112,11 @@ function run_program {
         head=$(basename ${inpname} .inp)
         echo "Run ${target_dir}/${inpname}"
         if [[ "x$PJM_RSCGRP" == "xsmall" ]]; then
+            ((mpi_idx++))
             cmd="${mpiexec} -np $mpi -stdout-proc ${head}/out -stderr-proc ${head}/err $spdyn ${inpname}"
             echo "${cmd}"
             eval "${cmd}"
+            rename_output
         else
             mkdir -p "${head}"
             cmd="${mpiexec} -np ${mpi} $spdyn ${inpname} >${head}/out.1.0"
@@ -162,6 +164,11 @@ function backup {
         [[ -e $rst ]] && mkdir -p ${backup_name} && mv ${rst} ${backup_name}
         [[ -d ${out} ]] && mkdir -p ${backup_name} && mv ${out} ${backup_name}
     done
+}
+
+function rename_output() {
+    # recover output/out.1.0
+    [[ -e ${head}/out.${mpi_idx}.0 ]] && ! [[ -e ${head}/err.1.0 ]] && mv ${head}/out.${mpi_idx}.0 ${head}/out.1.0
 }
 #################################################
 
@@ -296,6 +303,7 @@ $(declare -f submit_main)
 $(declare -f generate_inp)
 $(declare -f run_program)
 $(declare -f backup)
+$(declare -f rename_output)
 submit_main
 EOF
 }
