@@ -17,7 +17,7 @@ function submit_config() {
         source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12-serine.sh
     # tsubame
     elif [[ "x${QUEUE}" == "xall.q" ]]; then
-        ncpu=$(nproc)
+        ncpu=${NSLOTS}
         module purge
         module load intel/2024.0.2 intel-mpi/2021.11 cuda/12.3.2
         spdyn="/home/2/uj02562/data/software/genesis-2.1.4/bin/spdyn-intel-mixed-cuda12"
