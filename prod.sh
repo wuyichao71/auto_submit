@@ -5,6 +5,8 @@ function submit_config() {
     for key in "${!input[@]}"; do
         printf -v "$key" '%s' "${input[$key]}"
     done
+    printenv
+
     mpiexec=mpiexec
     local=/home/wuyichao/Documents/software/genesis-2.1.6.1
     # beta and serine
@@ -15,8 +17,18 @@ function submit_config() {
         source ${local}/setup-mixed-intel-cuda12-${SLURMD_NODENAME}.sh
         return
     fi
-    # tsubame
     if [[ "x${QUEUE}" == "xall.q" ]]; then
+        # kinase and helix
+        if [[ "x${HOSTNAME}" == "x"*".local" ]]; then
+            ncpu=${NSLOTS:-$(nproc)}
+            export OMP_NUM_THREADS=1
+            openmp=${OMP_NUM_THREADS}
+            ((mpi = ncpu / openmp))
+            spdyn=${local}/bin/spdyn-mixed-intel-cuda12
+            source ${local}/setup-mixed-intel-cuda12.sh
+            return
+        fi
+        # tsubame
         ncpu=${NSLOTS}
         module purge
         module load intel/2024.0.2 intel-mpi/2021.11 cuda/12.3.2
@@ -47,23 +59,6 @@ function submit_config() {
         spdyn=spdyn
         return
     fi
-    # kinase
-    if [[ "x${HOSTNAME}" == "xkinase.local" ]]; then
-        ncpu=${NSLOTS:-$(nproc)}
-        export OMP_NUM_THREADS=1
-        openmp=${OMP_NUM_THREADS}
-        ((mpi = ncpu / openmp))
-        spdyn=${local}/bin/spdyn-mixed-intel-cuda11
-        source ${local}/setup-mixed-intel-cuda11.sh
-        return
-    fi
-    ncpu=$(nproc)
-    export OMP_NUM_THREADS=1
-    openmp=${OMP_NUM_THREADS}
-    ((mpi = ncpu / openmp))
-    spdyn=${/bin/spdyn-mixed-intel-cuda12
-    source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
-    printenv
 }
 
 function submit_main() {
