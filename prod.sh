@@ -2,21 +2,21 @@
 
 #################################################
 function submit_config() {
+    for key in "${!input[@]}"; do
+        printf -v "$key" '%s' "${input[$key]}"
+    done
     mpiexec=mpiexec
-    # beta
-    if [[ "x${SLURMD_NODENAME}" == "xbeta" ]]; then
+    local=/home/wuyichao/Documents/software/genesis-2.1.6.1
+    # beta and serine
+    if [[ "x${SLURMD_NODENAME}" =~ x(beta|serine) ]]; then
         mpi=24
         export OMP_NUM_THREADS=1
-        spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12-beta
-        source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
-    # serine
-    elif [[ "x${SLURMD_NODENAME}" == "xserine" ]]; then
-        mpi=24
-        export OMP_NUM_THREADS=1
-        spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12-serine
-        source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12-serine.sh
+        spdyn=${local}/bin/spdyn-mixed-intel-cuda12-${SLURMD_NODENAME}
+        source ${local}/setup-mixed-intel-cuda12-${SLURMD_NODENAME}.sh
+        return
+    fi
     # tsubame
-    elif [[ "x${QUEUE}" == "xall.q" ]]; then
+    if [[ "x${QUEUE}" == "xall.q" ]]; then
         ncpu=${NSLOTS}
         module purge
         module load intel/2024.0.2 intel-mpi/2021.11 cuda/12.3.2
@@ -24,15 +24,10 @@ function submit_config() {
         export OMP_NUM_THREADS=${omp}
         openmp=${OMP_NUM_THREADS}
         ((mpi = ncpu / openmp))
-    elif [[ ${HOSTNAME} == cell ]]; then
-        ncpu=$(nproc)
-        export OMP_NUM_THREADS=1
-        openmp=${OMP_NUM_THREADS}
-        ((mpi = ncpu / openmp))
-        spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
-        source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
+        return
+    fi
     #ims
-    elif [[ ${PBS_O_HOST} == ccpbs* ]]; then
+    if [[ ${PBS_O_HOST} == ccpbs* ]]; then
         openmp=${OMP_NUM_THREADS}
         mpi=$(wc -l < "${PBS_NODEFILE}")
         if [ ! -z "${PBS_O_WORKDIR}" ]; then
@@ -40,26 +35,35 @@ function submit_config() {
         fi
         source ~/software/genesis-2.1.6.1/setup-mixed-ims.sh
         spdyn=/lustre/home/users/fen/software/genesis-2.1.6.1/bin/spdyn-mixed-ims
-    elif [[ ${PJM_RSCGRP} == small ]]; then
+        return
+    fi
+    # fugaku
+    if [[ ${PJM_RSCGRP} == small ]]; then
         export PLE_MPI_STD_EMPTYFILE=off
         export OMP_NUM_THREADS=$((PJM_NODE * $(nproc) / PJM_MPI_PROC))
         mpi=${PJM_MPI_PROC:-16}
         source /vol0004/apps/oss/spack/share/spack/setup-env.sh
         spack load /46ohljh # genesis#2.1.6.1 mixed
         spdyn=spdyn
-    else
-        printenv
+        return
+    fi
+    # kinase
+    if [[ "x${HOSTNAME}" == "xkinase.local" ]]; then
         ncpu=${NSLOTS:-$(nproc)}
         export OMP_NUM_THREADS=1
         openmp=${OMP_NUM_THREADS}
         ((mpi = ncpu / openmp))
-        spdyn=/home/wuyichao/Documents/software/genesis-2.1.6.1/bin/spdyn-mixed-intel-cuda12
-        source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
+        spdyn=${local}/bin/spdyn-mixed-intel-cuda11
+        source ${local}/setup-mixed-intel-cuda11.sh
+        return
     fi
-    
-    for key in "${!input[@]}"; do
-        printf -v "$key" '%s' "${input[$key]}"
-    done
+    ncpu=$(nproc)
+    export OMP_NUM_THREADS=1
+    openmp=${OMP_NUM_THREADS}
+    ((mpi = ncpu / openmp))
+    spdyn=${/bin/spdyn-mixed-intel-cuda12
+    source ~/Documents/software/genesis-2.1.6.1/setup-mixed-intel-cuda12.sh
+    printenv
 }
 
 function submit_main() {
