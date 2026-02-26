@@ -49,10 +49,12 @@ if ! [[ -e $spdyn ]]; then
     fi
 
     if [[ $1 == configure ]]; then
-        if [[ $name == *ims* ]] && [[ $name != *intel* ]]; then
-            FC=mpif90 CC=mpicc LAPACK_LIBS=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl" ./configure --program-suffix="-${suffix}" "${mixed}" "${gpu}"
+        if [[ $name == *ims* ]] && [[ $name == *intel* ]] && [[ $name == *simple* ]]; then
+            FC=mpiifx CC=mpiicx CXX=mpiicpx ./configure --program-suffix="-${suffix}" "${mixed}" "${gpu}"
         elif [[ $name == *ims* ]] && [[ $name == *intel* ]]; then
             FC=mpiifx CC=mpiicx CXX=mpiicpx LAPACK_LIBS=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl" ./configure --program-suffix="-${suffix}" "${mixed}" "${gpu}"
+        elif [[ $name == *ims* ]]; then
+            FC=mpif90 CC=mpicc LAPACK_LIBS=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl" ./configure --program-suffix="-${suffix}" "${mixed}" "${gpu}"
         else
             ./configure --program-suffix="-${suffix}" "$mixed" "$gpu"
         fi
