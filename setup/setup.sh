@@ -1,4 +1,5 @@
 name=${BASH_SOURCE[0]}
+
 if [[ $name == *ims* ]]; then
     module -s purge
     module -s load gcc-toolset/13
@@ -7,6 +8,12 @@ if [[ $name == *ims* ]]; then
     if [[ $name == *cuda12* ]]; then
         module -s load cuda/12.6u2
     fi
+elif [[ $name == *tsubame* ]]; then
+    module load intel/2025.0.0 intel-mpi/2021.11 
+    if [[ $name == *cuda12* ]]; then
+        module load cuda/12.8.0
+    fi
+    njob=32
 else
     if [[ $name == *intel* ]]; then
         source /home/appl/intel/oneapi/setvars.sh
@@ -47,8 +54,8 @@ if ! [[ -e $spdyn ]]; then
             ./configure --program-suffix="-${suffix}" "$mixed" "$gpu"
         fi
     elif [[ $1 == make ]]; then
-        make -j 8
+        make -j ${njob:-8}
     elif [[ $1 == install ]]; then
-        make install -j 8
+        make install -j ${njob:-8}
     fi
 fi
