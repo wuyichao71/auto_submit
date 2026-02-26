@@ -16,9 +16,16 @@ function main() {
     declare -A count
     for file in $(ls -hv */run*/prod/out.1.0)
     do
-        # 1. get gpu card number
+        # get gpu card number
         gpu=$(extract '# of GPUs' $file)
-        # 2. if on tsubame, set queue dependent on gpu card type and gpu card number
+        # get mpi number
+        mpi=$(extract 'MPI proc' $file)
+        # get openmp number
+        omp=$(extract 'OpenMP' $file)
+        # get cpu number (mpi * omp)
+        cpu=$(extract "CPU cores" $file)
+        node=0
+        # if on tsubame, set queue dependent on gpu card type and gpu card number
         if [[ "x$HOSTNAME" == "xlogin"* ]]; then
             gpu_model="$(grep 'gpu model' $file)"
             if [[ "x${gpu_model}" == "x"*"NVIDIA H100 MIG 3g.47gb (CC 9.0)"* ]]; then
@@ -34,22 +41,17 @@ function main() {
             queue=$(extract 'exec. host' $file)
             queue=${queue#*@}
             queue=${queue%.*}
+        elif [[ "x$HOSTNAME" == xfn*sv* ]]; then
+            ((node = cpu / 48))
         fi
 
         # if gpu is empty, set to zero
         gpu=${gpu:-0}
-
-        # get mpi number
-        mpi=$(extract 'MPI proc' $file)
-        # get openmp number
-        omp=$(extract 'OpenMP' $file)
-        # get cpu number (mpi * omp)
-        cpu=$(extract "CPU cores" $file)
         # get total time
         total_time=$(extract 'total time' $file)
         # if total time is empty, skip this part
         if [[ -n "${total_time}" ]]; then
-            key="queue=${queue},gpu=${gpu},cpu=${cpu},mpi=${mpi},omp=${omp}"
+            key="queue=${queue},node=${node},gpu=${gpu},cpu=${cpu},mpi=${mpi},omp=${omp}"
             time_sum[$key]=$(bc <<<"${time_sum[$key]:-0} + ${total_time}")
             ((count[$key] += 1))
         fi
@@ -61,7 +63,7 @@ function main() {
         hour=$(bc <<<"scale=1; ${time} / 3600")
         ns=$(bc <<<"scale=1; 0.0035 * 600000 * 24 * 3600 / ${time} / 1000")
         echo "${key},time_sum=${time_sum[$key]},count=${count[$key]},time=${time},hour=${hour},ns/day=${ns}"
-    done
+    done | tee benchmark.csv
 
 }
 
