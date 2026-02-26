@@ -8,6 +8,7 @@ if [[ $name == *ims* ]]; then
     if [[ $name == *cuda12* ]]; then
         module -s load cuda/12.6u2
     fi
+    njob=64
 elif [[ $name == *tsubame* ]]; then
     module load intel/2025.0.0 intel-mpi/2021.11 
     if [[ $name == *cuda12* ]]; then
@@ -48,8 +49,10 @@ if ! [[ -e $spdyn ]]; then
     fi
 
     if [[ $1 == configure ]]; then
-        if [[ $name == *ims* ]]; then
+        if [[ $name == *ims* ]] && [[ $name != *intel* ]]; then
             FC=mpif90 CC=mpicc LAPACK_LIBS=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl" ./configure --program-suffix="-${suffix}" "${mixed}" "${gpu}"
+        elif [[ $name == *ims* ]] && [[ $name == *intel* ]]; then
+            FC=mpiifx CC=mpiicx CXX=mpiicpx LAPACK_LIBS=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl" ./configure --program-suffix="-${suffix}" "${mixed}" "${gpu}"
         else
             ./configure --program-suffix="-${suffix}" "$mixed" "$gpu"
         fi
