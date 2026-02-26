@@ -13,28 +13,17 @@ config = {
 
 
 def convert_value(x: str):
-    if '.' in x:
-        return float(x)
-    elif x.isdigit():
-        return int(x)
-    return x
+    try:
+        if '.' in x:
+            return float(x)
+        elif x.isdigit():
+            return int(x)
+        return x
+    except Exception:
+        return x
 
 
-def main():
-    csv_name = config['csv_template']
-
-    # load CSV without a header row (header=None). pandas will assign
-    # integer column names 0,1,2,... unless you provide names explicitly.
-    df = pd.read_csv(csv_name, sep=',', header=None,)
-
-    benchmark = []
-    for idx, row in df.iterrows():
-        a_bench = {}
-        for col_name, value in row.items():
-            k, v = value.split('=')
-            a_bench[k] = convert_value(v)
-        benchmark.append(a_bench)
-    
+def plot_line(benchmark):
     plot_data = {}
     omp_set = set(d['omp'] for d in benchmark)
     for omp in sorted(omp_set):
@@ -44,7 +33,7 @@ def main():
         node_sort = node[idx]
         ns_sort = ns[idx]
         plot_data[omp] = {"x": node_sort, "y": ns_sort}
-    
+
     fig = plt.figure()
     for i, omp in enumerate(plot_data):
         plt.plot(plot_data[omp]['x'], plot_data[omp]['y'], 
@@ -56,12 +45,46 @@ def main():
     plt.ylabel('benchmark [ns/day]')
     plt.xscale('log', base=2)
     plt.yscale('log', base=10)
+
+
+def plot_bar(benchmark):
+
+    # tsubame
+    if 'login' in os.uname().nodename:
+        labels = [f"{b['queue']} (m{b['mpi']}o{b['omp']})" for b in benchmark]
+        y = [b['ns/day'] for b in benchmark]
+        x = np.arange(len(y))
+
+    fig = plt.figure()
+    plt.bar(x, y)
+    plt.xticks(x, labels)
+    plt.grid(which='both')
+    plt.xlabel('node type')
+    plt.ylabel('benchmark [ns/day]')
+
+
+def main():
+    csv_name = config['csv_template']
+    # load CSV without a header row (header=None). pandas will assign
+    # integer column names 0,1,2,... unless you provide names explicitly.
+    df = pd.read_csv(csv_name, sep=',', header=None,)
+
+    benchmark = []
+    for idx, row in df.iterrows():
+        a_bench = {}
+        for col_name, value in row.items():
+            k, v = value.split('=')
+            a_bench[k] = convert_value(v)
+        benchmark.append(a_bench)
+
+    if benchmark[0]['node'] == 0:
+        plot_bar(benchmark)
+    else:
+        plot_line(benchmark)
     plt.tight_layout()
     outname = config['out_template']
     Path(outname).parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(outname)
-    
-
 
 
 if __name__ == '__main__':

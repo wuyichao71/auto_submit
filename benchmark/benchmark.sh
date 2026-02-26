@@ -16,6 +16,10 @@ function main() {
     declare -A count
     for file in $(ls -hv */run*/prod/out.1.0)
     do
+        # get version
+        version=$(extract 'version' $file)
+        # get precision
+        precision=$(extract 'precision' $file)
         # get gpu card number
         gpu=$(extract '# of GPUs' $file)
         # get mpi number
@@ -51,7 +55,7 @@ function main() {
         total_time=$(extract 'total time' $file)
         # if total time is empty, skip this part
         if [[ -n "${total_time}" ]]; then
-            key="queue=${queue},node=${node},gpu=${gpu},cpu=${cpu},mpi=${mpi},omp=${omp}"
+            key="queue=${queue},version=${version},precision=${precision},node=${node},gpu=${gpu},cpu=${cpu},mpi=${mpi},omp=${omp}"
             time_sum[$key]=$(bc <<<"${time_sum[$key]:-0} + ${total_time}")
             ((count[$key] += 1))
         fi

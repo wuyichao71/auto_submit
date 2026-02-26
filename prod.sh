@@ -9,6 +9,7 @@ function submit_config() {
 
     mpiexec=mpiexec
     local=/home/wuyichao/Documents/software/genesis-2.1.6.1
+    tsubame_local=/home/2/uj02562/data/software/genesis-2.1.6.1
     # beta and serine
     if [[ "x${SLURMD_NODENAME}" =~ x(beta|serine) ]]; then
         mpi=24
@@ -30,9 +31,14 @@ function submit_config() {
         fi
         # tsubame
         ncpu=${NSLOTS}
-        module purge
-        module load intel/2024.0.2 intel-mpi/2021.11 cuda/12.3.2
-        spdyn="/home/2/uj02562/data/software/genesis-2.1.4/bin/spdyn-intel-mixed-cuda12"
+        ## node_* gpu_*
+        if [[ ${queue} =~ (gpu|node)_. ]]; then
+            source ${tsubame_local}/setup-mixed-intel-cuda12-tsubame.sh
+            spdyn="${tsubame_local}/bin/spdyn-mixed-intel-cuda12-tsubame"
+        elif [[ ${queue} =~ cpu_[0-9]+ ]]; then
+            source ${tsubame_local}/setup-mixed-intel-tsubame.sh
+            spdyn="${tsubame_local}/bin/spdyn-mixed-intel-tsubame"
+        fi
         export OMP_NUM_THREADS=${omp}
         openmp=${OMP_NUM_THREADS}
         ((mpi = ncpu / openmp))
@@ -184,7 +190,7 @@ function get_job_name() {
     job_name_list=()
     # depend on hpc
     # helix kinase
-    if [[ $queue =~ (helix|kinase|gpu_.|node_.) ]]; then
+    if [[ $queue =~ (helix|kinase|gpu_.|node_.|cpu_.*) ]]; then
         jobid_list=$(qstat | awk -v user=$(whoami) '$4==user {print $1}')
         for jobid in ${jobid_list}
         do
@@ -320,8 +326,8 @@ function submit_repi() {
     elif [[ ${queue} =~ (beta|serine) ]]; then
         sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}
     # tsubame
-    elif [[ ${queue} =~ (gpu|node)_. ]]; then
-        qsub -cwd -l "h_rt=${time}" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} -v "omp=${omp}" ${script}
+    elif [[ ${queue} =~ (gpu_.|node.|cpu_.*) ]]; then
+        qsub -cwd -l "h_rt=${time}" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} -v "omp=${omp}" -v "queue=${queue}" ${script}
     elif [[ ${queue} == ims ]]; then
         ((mpi = node / omp))
         cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}' \
