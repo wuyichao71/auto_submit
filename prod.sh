@@ -70,9 +70,10 @@ function submit_config() {
 function submit_main() {
     submit_config
     mpi_idx=0
-    for((i=0; i<n_loop; i++))
+    i=0
+    ((runi=initial_runi))
+    while [[ $i -lt $n_loop ]]
     do
-        ((runi = ini_runi + i))
         ((prev_runi = runi - 1))
         if [[ ${runi} -gt ${max_runi} ]]; then
             break
@@ -82,6 +83,11 @@ function submit_main() {
         mkdir -p $target_dir
         cd $target_dir
 
+        if submit_check_full; then
+            ((runi++))
+            continue
+        fi
+
         box_size=""
         restraints=""
         if [[ $runi -eq 0 ]]; then
@@ -90,6 +96,8 @@ function submit_main() {
         fi
         generate_inp
         run_program
+        ((i++))
+        ((runi++))
         cd $origin_dir
     done
 }
@@ -105,7 +113,6 @@ function generate_inp() {
         if [[ ${runi} -ne 0 ]]; then
             rstfile="rstfile = ../run${prev_runi}/${head}${prev_runi}.rst"
         fi
-        
         eval "echo \"${template_list[idx]}\"" >${inpname}
     done
 }
@@ -175,6 +182,20 @@ function rename_output() {
     # recover output/out.1.0
     [[ -e ${head}/out.${mpi_idx}.0 ]] && ! [[ -e ${head}/out.1.0 ]] && mv ${head}/out.${mpi_idx}.0 ${head}/out.1.0
 }
+
+function submit_check_full() {
+    for inpname in "${inpname_list[@]}"
+    do
+        head=$(basename ${inpname} .inp)
+        dcd=${head}${runi}.dcd
+        rst=${head}${runi}.rst
+        out=${head}/out.1.0
+        [[ -e "$dcd" ]] && full_dcd "$dcd" || return 1
+        [[ -e "$rst" ]] && full_rst "$rst" || return 1
+        [[ -e "$out" ]] && full_out "$out" || return 1
+    done
+    return 0
+}
 #################################################
 
 function is_run() {
@@ -188,6 +209,7 @@ function is_run() {
 function get_job_name() {
     # save job_name in job_name_list
     job_name_list=()
+    job_id_list=()
     # depend on hpc
     # helix kinase
     if [[ $queue =~ (helix|kinase|gpu_.|node_.|cpu_.*) ]]; then
@@ -206,8 +228,12 @@ function get_job_name() {
     # fugaku
     elif [[ $queue =~ (small) ]]; then
         job_name_list=($(pjstat --data |grep '^,' |awk -F, '{print $3}'))
+        job_id_list=($(pjstat --data |grep '^,' |awk -F, '{print $2}'))
     fi
-    echo "${job_name_list[@]}"
+    for idx in "${!job_name_list[@]}"
+    do
+        echo "${job_id_list[$idx]} --> ${job_name_list[$idx]}"
+    done
 }
 
 function find_ini_exist_runi() {
@@ -221,7 +247,7 @@ function find_ini_exist_runi() {
         do
             run_dir="run${ini_exist_runi}"
             head=$(basename ${inpname} .inp)
-            rst=${run_dir}/${head}${ini_runi}.rst
+            rst=${run_dir}/${head}${initial_runi}.rst
             [[ -e ${rst} ]] && full_rst ${rst} || is_rst_exist=false
         done
         [[ ${is_rst_exist} == true ]] && { is_runned=true; break; }
@@ -232,74 +258,88 @@ function find_ini_exist_runi() {
     fi
 }
 
-function find_ini_runi() {
-    ini_runi=0
+function check_full() {
     for inpname in "${inpname_list[@]}"
     do
-        run_dir="run${ini_runi}"
         head=$(basename ${inpname} .inp)
-        rst=${run_dir}/${head}${ini_runi}.rst
+        run_dir="run${initial_runi}"
+        dcd=${run_dir}/${head}${initial_runi}.dcd
+        rst=${run_dir}/${head}${initial_runi}.rst
+        out=${run_dir}/${head}/out.1.0
+        [[ -d $run_dir ]] || return 1
+        [[ -e "$dcd" ]] && full_dcd "$dcd" || return 1
+        [[ -e "$rst" ]] && full_rst "$rst" || return 1
+        [[ -e "$out" ]] && full_out "$out" || return 1
+    done
+    return 0
+}
+
+function find_initial_runi() {
+    initial_runi=0
+    for inpname in "${inpname_list[@]}"
+    do
+        run_dir="run${initial_runi}"
+        head=$(basename ${inpname} .inp)
+        rst=${run_dir}/${head}${initial_runi}.rst
         [[ ${ini_exist_runi} -eq 0 ]] && ! ([[ -e $rst ]] && full_rst ${rst}) && return
     done 
-    ((ini_runi = ini_exist_runi + 1))
+    ((initial_runi = ini_exist_runi + 1))
     while true
     do
-        is_break=false
-        for inpname in "${inpname_list[@]}"
-        do
-            head=$(basename ${inpname} .inp)
-            run_dir="run${ini_runi}"
-            dcd=${run_dir}/${head}${ini_runi}.dcd
-            rst=${run_dir}/${head}${ini_runi}.rst
-            out=${run_dir}/${head}/out.1.0
-            [[ -d $run_dir ]] || { is_break=true; break; }
-            [[ -e $dcd ]] || { is_break=true; break; }
-            full_dcd ${dcd} || { is_break=true; break; }
-            full_out ${out} || { is_break=true; break; }
-            full_rst ${rst} || { is_break=true; break; }
-        done
-        [[ "${is_break}" == true ]] && break
-        ((ini_runi++))
+        check_full || break
+        ((initial_runi++))
     done
 }
 
+function is_normal_mode() {
+    # check whether the job is in normal mode
+    local mode=$(pjstat --data | grep "$1" | awk -F, '{print $4}')
+    [[ "x$mode" == "xNM" ]] && return 0
+    return 1
+}
+
 function submit() {
-    get_job_name
     for((repi=$repi_ini;repi<=$repi_end;repi++))
     do
         target_dir=${repi}
         origin_dir=$(pwd)
         job_name="${job_head}-${type}-${repi}"
 
-        is_run && continue
-        cd ${target_dir}
-        find_ini_exist_runi
-        find_ini_runi
-        if [[ $ini_runi -gt ${input[max_runi]} ]]; then
+        if [[ $is_step == false ]]; then
+            is_run && continue
+        elif is_normal_mode "${job_name}"; then
+            echo "The job is not step mode!"
+            exit
             continue
         fi
-        echo "${job_name}: ini_exist_runi=$ini_exist_runi, ini_runi=$ini_runi"
+
+        cd ${target_dir}
+        find_ini_exist_runi
+        find_initial_runi
+        if [[ $initial_runi -gt ${input[max_runi]} ]]; then
+            continue
+        fi
+        echo "${job_name}: ini_exist_runi=$ini_exist_runi, initial_runi=$initial_runi"
         echo "submit ($job_name)"
         generate_script
         log=log/stdout
         mkdir -p $(dirname ${log})
         [[ -n ${log} ]] && : > ${log}
-        if [[ "x$1" == "xyes" ]]; then
-            submit_repi
-        fi
+        submit_repi
         cd ${origin_dir}
     done
 }
 
 function generate_script() {
     mkdir -p ${submit_dir}
-    ((runi_ini=ini_runi))
+    ((runi_ini=initial_runi))
     ((runi_end=runi_ini+input[n_loop]-1))
     script=$(eval "echo ${submit_dir}/${submit_name}")
     cat >${script} <<EOF
 #!/usr/bin/env bash
 #PBS -j oe
-ini_runi=${ini_runi}
+echo "initial_runi=\${initial_runi}"
+initial_runi=${initial_runi}
 $(declare -p input)
 $(declare -p inpname_list)
 $(declare -p template_list)
@@ -309,6 +349,10 @@ $(declare -f generate_inp)
 $(declare -f run_program)
 $(declare -f backup)
 $(declare -f rename_output)
+$(declare -f full_dcd)
+$(declare -f full_out)
+$(declare -f full_rst)
+$(declare -f submit_check_full)
 submit_main
 EOF
 }
@@ -318,16 +362,24 @@ function submit_repi() {
     if [[ ${queue} =~ (helix|kinase) ]]; then
         cmd="qsub -cwd -pe mpi ${node} -q ${queue} -e ${log} -o ${log} -N ${job_name} ${script}"
         echo $cmd
-        eval $cmd
     elif [[ ${queue} == cell ]]; then
-        echo "qsub -cwd -pe mpi ${node} -q ${queue} -e ${log} -o ${log} -N ${job_name} ${script}"
-        echo "sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}"
-        bash ${script}
+        cmd="echo 'hello, world'"
+    # beta serine
     elif [[ ${queue} =~ (beta|serine) ]]; then
-        sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}
+        cmd="sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}"
+        echo $cmd
     # tsubame
     elif [[ ${queue} =~ (gpu_.|node.|cpu_.*) ]]; then
-        qsub -cwd -l "h_rt=${time}" -g $(groups | awk '{print $NF}') -l "${queue}=${node}" -o ${log} -j y -N ${job_name} -v "omp=${omp}" -v "queue=${queue}" ${script}
+        cmd="qsub -cwd -l 'h_rt=${time}' \
+            -g $(groups | awk '{print $NF}') \
+            -l '${queue}=${node}' \
+            -o ${log} \
+            -j y \
+            -N ${job_name} \
+            -v 'omp=${omp}' \
+            -v 'queue=${queue}' \
+            ${script}"
+        echo $cmd
     elif [[ ${queue} == ims ]]; then
         ((mpi = node / omp))
         cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}' \
@@ -338,8 +390,13 @@ function submit_repi() {
         echo $cmd
         eval $cmd
     elif [[ ${queue} == small ]]; then
+        step_para=""
+        if [[ $is_step == true ]]; then
+            step_para="--step --sparam 'jnam=${job_name}'"
+        fi
         ((mpi_per_node = 48 / omp))
         cmd="pjsub -L 'rscgrp=${queue}' \
+            ${step_para} \
             -L 'rscunit=rscunit_ft01' \
             -L 'node=${node}' \
             --mpi 'max-proc-per-node=${mpi_per_node}' \
@@ -347,11 +404,14 @@ function submit_repi() {
             -L 'elapse=${time}' \
             -x 'PJM_LLIO_GFSCACHE=/vol0004:/vol0005:/vol0003' \
             -N ${job_name} \
+            -x 'initial_runi=${initial_runi}' \
             -o ${log} \
             -e ${log} \
             ${script}"
         echo $cmd
-        eval $cmd
+    fi
+    if [[ $is_submit == true ]]; then
+        eval "$cmd"
     fi
 }
 
@@ -367,12 +427,8 @@ function setup_directory() {
 # main function
 function main() {
     set_config "$@"
-    if [[ $# -eq 0 ]]; then
-        is_submit=no
-    else
-        is_submit=${!#}
-    fi
-    submit $is_submit
+    get_job_name
+    submit $is_submit $is_step
 }
 
 function set_submit_parameter() {
@@ -393,6 +449,41 @@ function set_submit_parameter() {
             printf -v "${name_list[i]}" "${tokens[i]}"
         fi
     done
+}
+
+usage() {
+  cat <<EOF
+Usage:
+  $(basename "$0") [OPTIONS] [repi_ini [repi_end]]
+
+Description:
+  Options and positional arguments may be interleaved.
+  Use '--' to explicitly terminate option parsing.
+
+Positional arguments:
+  repi_ini          Starting replica index
+  repi_end          Ending replica index (optional)
+
+Options:
+  -y, --submit      Enable submit mode
+  -s, --step        Enable step mode
+  -n, --n_loop N    Number of loops (default: 1)
+  -h, --help        Show this help message and exit
+
+Behavior:
+  No positional arguments:
+      Process all replicas.
+  One positional argument:
+      Process only that replica.
+  Two positional arguments:
+      Process replicas in range [repi_ini, repi_end].
+
+Examples:
+  $(basename "$0") 1 3 --submit
+  $(basename "$0") --step -n 7 3
+  $(basename "$0") -y -s -- 1 3
+  $(basename "$0") --help
+EOF
 }
 
 # set_config function
@@ -495,15 +586,47 @@ EOF
     )
     [[ -f para ]] && set -a && source para && set +a
     [[ -f para.${queue} ]] && set -a && source para.${queue} && set +a
-    if [[ $1 =~ [0-9]+ ]]; then
-        repi_ini=$1
-        repi_end=$1
+    is_submit=false
+    is_step=false
+    positional=()
+    while [[ $# -gt 0 ]]
+    do
+        case "$1" in
+            -y|--submit) is_submit=true; shift ;;
+            -s|--step) is_step=true; shift ;;
+            -n|--n_loop)
+                [[ $# -ge 2 ]] || { echo "Error: --n_loop needs a value"; exit 1; }
+                input[n_loop]="$2"
+                shift 2
+                ;;
+            -h|--help)
+                usage; exit 0 ;;
+            --)
+                shift; positional+=("$@"); break ;;
+            -*)
+                echo "Unknown option: $1"; usage; exit 1 ;;
+            *)
+                positional+=("$1"); shift ;;
+        esac
+    done
+    [[ ${#positional[@]} -gt 2 ]] && { usage; exit 1; }
+    if [[ -n ${positional[0]} ]]; then
+        if [[ "${positional[0]}" =~ [0-9]+ ]]; then
+            repi_ini=${positional[0]}
+            repi_end=${positional[0]}
+        else
+            usage; exit 1;
+        fi
     fi
-    if [[ $2 =~ [0-9]+ ]]; then
-        repi_end=$2
+    if [[ -n ${positional[1]} ]]; then
+        if [[ "${positional[1]}" =~ [0-9]+ ]]; then
+            repi_end=${positional[1]}
+        else
+            usage; exit 1;
+        fi
     fi
-    echo "repi_ini=${repi_ini}, repi_end=${repi_end}"
-    echo "input[n_loop]=${input[n_loop]}"
+   
+    echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, is_submit=${is_submit}, is_step=${is_step}"
     setup_directory
 }
 
