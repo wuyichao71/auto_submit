@@ -83,21 +83,17 @@ function submit_main() {
         target_dir="run${runi}"
         mkdir -p $target_dir
         cd $target_dir
-
-        if submit_check_full; then
-            ((runi++))
-            continue
+        if ! submit_check_full; then
+            box_size=""
+            restraints=""
+            if [[ $runi -eq 0 ]]; then
+                box_size=${initial_box_size}
+                restraints=${initial_restraints}
+            fi
+            generate_inp
+            run_program
+            ((i++))
         fi
-
-        box_size=""
-        restraints=""
-        if [[ $runi -eq 0 ]]; then
-            box_size=${initial_box_size}
-            restraints=${initial_restraints}
-        fi
-        generate_inp
-        run_program
-        ((i++))
         ((runi++))
         cd $origin_dir
     done
@@ -294,7 +290,7 @@ function find_initial_runi() {
 
 function is_normal_mode() {
     # check whether the job is in normal mode
-    local mode=$(pjstat --data | grep "$1" | awk -F, '{print $4}')
+    local mode=$(pjstat --data --filter "jnam=$1" | grep '^,' | awk -F, '{print $4}')
     [[ "x$mode" == "xNM" ]] && return 0
     return 1
 }
@@ -310,7 +306,6 @@ function submit() {
             is_run && continue
         elif is_normal_mode "${job_name}"; then
             echo "The job is not step mode!"
-            exit
             continue
         fi
 
@@ -323,9 +318,6 @@ function submit() {
         echo "${job_name}: ini_exist_runi=$ini_exist_runi, initial_runi=$initial_runi"
         echo "submit ($job_name)"
         generate_script
-        log=log/stdout
-        mkdir -p $(dirname ${log})
-        [[ -n ${log} ]] && : > ${log}
         submit_repi
         cd ${origin_dir}
     done
@@ -360,6 +352,7 @@ EOF
 }
 
 function submit_repi() {
+    log=log/stdout
     # helix kinase
     if [[ ${queue} =~ (helix|kinase) ]]; then
         cmd="qsub \
@@ -422,6 +415,8 @@ function submit_repi() {
         echo $cmd
     fi
     if [[ $is_submit == true ]]; then
+        mkdir -p $(dirname ${log})
+        [[ -n ${log} ]] && : > ${log}
         eval "$cmd"
     fi
 }
@@ -445,7 +440,7 @@ function main() {
 function set_submit_parameter() {
     name_list=(__file__ queue node omp time)
     IFS='-' read -ra tokens <<< $(basename ${BASH_SOURCE[0]} .sh)
-    for i in "${!name_list[@]}"
+    for i in "${!tokens[@]}"
     do
         printf -v "${name_list[i]}" "${tokens[i]}"
     done
@@ -475,7 +470,10 @@ Options:
   -y, --submit      Enable submit mode
   -s, --step        Enable step mode
   -q, --queue       Queue name
-  -n, --n_loop N    Number of loops (default: 1)
+  -n, --node        Node number (default: 1)
+  -o, --omp         OpenMP number (default: 1)
+  -t, --time        Elapse limit time (default: 24:00:00)
+  -l, --n_loop N    Number of loops (default: 1)
   -h, --help        Show this help message and exit
 
 Behavior:
@@ -489,6 +487,7 @@ Behavior:
 Examples:
   $(basename "$0") 1 3 --submit
   $(basename "$0") --step -n 7 3
+  $(basename "$0") --step --n_loop 7 --queue small --omp 3 --node 24 3 6
   $(basename "$0") -y -s -- 1 3
   $(basename "$0") --help
 EOF
@@ -499,6 +498,9 @@ function set_config() {
     inpname_list=(prod.inp)
     submit_dir="submit_script"
     submit_name='sub-${runi_ini}-${runi_end}.sh'
+    omp=1
+    node=1
+    time=24:00:00
 
     job_head="homo"
     type=$(basename $PWD | awk -F'-' '{print $NF}')
@@ -602,13 +604,25 @@ EOF
         case "$1" in
             -y|--submit) is_submit=true; shift ;;
             -s|--step) is_step=true; shift ;;
-            -n|--n_loop)
+            -l|--n_loop)
                 [[ $# -ge 2 ]] || { echo "Error: --n_loop needs a value"; exit 1; }
                 input[n_loop]="$2"
                 shift 2
                 ;;
             -q|--queue)
                 queue=$2
+                shift 2
+                ;;
+            -n|--node)
+                node=$2
+                shift 2
+                ;;
+            -o|--omp)
+                omp=$2
+                shift 2
+                ;;
+            -t|--time)
+                time=$2
                 shift 2
                 ;;
             -h|--help)
