@@ -5,7 +5,8 @@ function submit_config() {
     for key in "${!input[@]}"; do
         printf -v "$key" '%s' "${input[$key]}"
     done
-    printenv
+
+    env
 
     mpiexec=mpiexec
     local=/home/wuyichao/Documents/software/genesis-2.1.6.1
@@ -209,12 +210,12 @@ function is_run() {
 function get_job_name() {
     # save job_name in job_name_list
     job_name_list=()
-    job_id_list=()
+    # job_id_list=()
     # depend on hpc
     # helix kinase
     if [[ $queue =~ (helix|kinase|gpu_.|node_.|cpu_.*) ]]; then
-        jobid_list=$(qstat | awk -v user=$(whoami) '$4==user {print $1}')
-        for jobid in ${jobid_list}
+        job_id_list=($(qstat | awk -v user=$(whoami) '$4==user {print $1}'))
+        for jobid in "${job_id_list[@]}"
         do
             _name=$(qstat -j $jobid | awk '/^job_name:/{print $2}')
             job_name_list+=($_name)
@@ -338,6 +339,7 @@ function generate_script() {
     cat >${script} <<EOF
 #!/usr/bin/env bash
 #PBS -j oe
+echo "omp=\${omp}"
 echo "initial_runi=\${initial_runi}"
 initial_runi=${initial_runi}
 $(declare -p input)
@@ -360,7 +362,15 @@ EOF
 function submit_repi() {
     # helix kinase
     if [[ ${queue} =~ (helix|kinase) ]]; then
-        cmd="qsub -cwd -pe mpi ${node} -q ${queue} -e ${log} -o ${log} -N ${job_name} ${script}"
+        cmd="qsub \
+            -cwd \
+            -pe mpi ${node} \
+            -q ${queue} \
+            -e ${log} \
+            -o ${log} \
+            -N ${job_name} \
+            -v 'initial_runi=${initial_runi},omp=${omp}' \
+            ${script}"
         echo $cmd
     elif [[ ${queue} == cell ]]; then
         cmd="echo 'hello, world'"
@@ -378,6 +388,7 @@ function submit_repi() {
             -N ${job_name} \
             -v 'omp=${omp}' \
             -v 'queue=${queue}' \
+            -v 'initial_runi=${initial_runi}' \
             ${script}"
         echo $cmd
     elif [[ ${queue} == ims ]]; then
@@ -436,21 +447,17 @@ function set_submit_parameter() {
     IFS='-' read -ra tokens <<< $(basename ${BASH_SOURCE[0]} .sh)
     for i in "${!name_list[@]}"
     do
-        # depend on hpc
-        if [[ "${name_list[i]}" == "queue" ]]; then
-            # helix kinase
-            if [[ ${tokens[i]} =~ (kinase|helix) ]]; then
-                printf -v "${name_list[i]}" "all.q@${tokens[i]}.local"
-            # beta serine cell
-            else
-                printf -v "${name_list[i]}" "${tokens[i]}"
-            fi
-        else
-            printf -v "${name_list[i]}" "${tokens[i]}"
-        fi
+        printf -v "${name_list[i]}" "${tokens[i]}"
     done
 }
 
+function update_queue() {
+    # depend on hpc
+    # helix kinase
+    if [[ "${queue}" =~ (kinase|helix) ]]; then
+        queue="all.q@${queue}.local"
+    fi
+}
 usage() {
   cat <<EOF
 Usage:
@@ -467,6 +474,7 @@ Positional arguments:
 Options:
   -y, --submit      Enable submit mode
   -s, --step        Enable step mode
+  -q, --queue       Queue name
   -n, --n_loop N    Number of loops (default: 1)
   -h, --help        Show this help message and exit
 
@@ -488,8 +496,6 @@ EOF
 
 # set_config function
 function set_config() {
-    set_submit_parameter
-
     inpname_list=(prod.inp)
     submit_dir="submit_script"
     submit_name='sub-${runi_ini}-${runi_end}.sh'
@@ -584,6 +590,8 @@ ${restraints}
 EOF
 )"
     )
+
+    set_submit_parameter
     [[ -f para ]] && set -a && source para && set +a
     [[ -f para.${queue} ]] && set -a && source para.${queue} && set +a
     is_submit=false
@@ -597,6 +605,10 @@ EOF
             -n|--n_loop)
                 [[ $# -ge 2 ]] || { echo "Error: --n_loop needs a value"; exit 1; }
                 input[n_loop]="$2"
+                shift 2
+                ;;
+            -q|--queue)
+                queue=$2
                 shift 2
                 ;;
             -h|--help)
@@ -625,8 +637,9 @@ EOF
             usage; exit 1;
         fi
     fi
-   
-    echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, is_submit=${is_submit}, is_step=${is_step}"
+
+    update_queue
+    echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, queue=${queue}, node=${node}, omp=${omp}, time=${time}, is_submit=${is_submit}, is_step=${is_step}"
     setup_directory
 }
 
