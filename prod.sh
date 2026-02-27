@@ -19,34 +19,39 @@ function submit_config() {
         source ${local}/setup-mixed-intel-cuda12-${SLURMD_NODENAME}.sh
         return
     fi
-    if [[ "x${QUEUE}" == "xall.q" ]]; then
-        # kinase and helix
-        if [[ "x${HOSTNAME}" == "x"*".local" ]]; then
-            ncpu=${NSLOTS:-$(nproc)}
-            export OMP_NUM_THREADS=1
-            openmp=${OMP_NUM_THREADS}
-            ((mpi = ncpu / openmp))
-            spdyn=${local}/bin/spdyn-mixed-intel-cuda12
-            source ${local}/setup-mixed-intel-cuda12.sh
-            return
-        fi
-        # tsubame
+    # tsubame
+    ## node_* gpu_*
+    if [[ ${queue} =~ (gpu|node)_. ]]; then
         ncpu=${NSLOTS}
-        ## node_* gpu_*
-        if [[ ${queue} =~ (gpu|node)_. ]]; then
-            source ${tsubame_local}/setup-mixed-intel-cuda12-tsubame.sh
-            spdyn="${tsubame_local}/bin/spdyn-mixed-intel-cuda12-tsubame"
-        elif [[ ${queue} =~ cpu_[0-9]+ ]]; then
-            source ${tsubame_local}/setup-mixed-intel-tsubame.sh
-            spdyn="${tsubame_local}/bin/spdyn-mixed-intel-tsubame"
-        fi
+        source ${tsubame_local}/setup-mixed-intel-cuda12-tsubame.sh
+        spdyn="${tsubame_local}/bin/spdyn-mixed-intel-cuda12-tsubame"
         export OMP_NUM_THREADS=${omp}
         openmp=${OMP_NUM_THREADS}
         ((mpi = ncpu / openmp))
         return
     fi
+    ## cpu_*
+    if [[ ${queue} =~ cpu_[0-9]+ ]]; then
+        ncpu=${NSLOTS}
+        source ${tsubame_local}/setup-mixed-intel-tsubame.sh
+        spdyn="${tsubame_local}/bin/spdyn-mixed-intel-tsubame"
+        export OMP_NUM_THREADS=${omp}
+        openmp=${OMP_NUM_THREADS}
+        ((mpi = ncpu / openmp))
+        return
+    fi
+    # kinase and helix
+    if [[ "x${HOSTNAME}" == "x"*".local" ]]; then
+        ncpu=${NSLOTS:-$(nproc)}
+        export OMP_NUM_THREADS=1
+        openmp=${OMP_NUM_THREADS}
+        ((mpi = ncpu / openmp))
+        spdyn=${local}/bin/spdyn-mixed-intel-cuda12
+        source ${local}/setup-mixed-intel-cuda12.sh
+        return
+    fi
     #ims
-    if [[ ${PBS_O_HOST} == ccpbs* ]]; then
+    if [[ "${queue}" == ims ]]; then
         openmp=${OMP_NUM_THREADS}
         mpi=$(wc -l < "${PBS_NODEFILE}")
         if [ ! -z "${PBS_O_WORKDIR}" ]; then
@@ -205,11 +210,10 @@ function is_run() {
 
 function get_job_name() {
     # save job_name in job_name_list
-    job_name_list=()
-    # job_id_list=()
     # depend on hpc
     # helix kinase
     if [[ $queue =~ (helix|kinase|gpu_.|node_.|cpu_.*) ]]; then
+        job_name_list=()
         job_id_list=($(qstat | awk -v user=$(whoami) '$4==user {print $1}'))
         for jobid in "${job_id_list[@]}"
         do
@@ -222,6 +226,7 @@ function get_job_name() {
     # ims
     elif [[ $queue =~ ims ]]; then
         job_name_list=($(jobinfo -c |grep -v '^[-Q]' |awk '{print $3}'))
+        job_id_list=($(jobinfo -c |grep -v '^[-Q]' |awk '{print $2}'))
     # fugaku
     elif [[ $queue =~ (small) ]]; then
         job_name_list=($(pjstat --data |grep '^,' |awk -F, '{print $3}'))
@@ -333,6 +338,7 @@ function generate_script() {
     cat >${script} <<EOF
 #!/usr/bin/env bash
 #PBS -j oe
+echo "queue=\${queue}"
 echo "omp=\${omp}"
 echo "initial_runi=\${initial_runi}"
 initial_runi=${initial_runi}
@@ -351,6 +357,14 @@ $(declare -f full_rst)
 $(declare -f submit_check_full)
 submit_main
 EOF
+}
+
+function find_jid() {
+    local jidx
+    for jidx in "${!job_name_list[@]}"
+    do
+        [[ "$1" == "${job_name_list[$jidx]}" ]] && echo "${job_id_list[$jidx]}"
+    done | sort -n | tail -n1
 }
 
 function submit_repi() {
@@ -387,20 +401,24 @@ function submit_repi() {
             -o ${log} \
             -j y \
             -N ${job_name} \
-            -v 'omp=${omp}' \
-            -v 'queue=${queue}' \
-            -v 'initial_runi=${initial_runi}' \
+            -v 'initial_runi=${initial_runi},queue=${queue},omp=${omp}' \
             ${script}"
         echo $cmd
     elif [[ ${queue} == ims ]]; then
+        if [[ $is_step == true ]]; then
+            local jid=$(find_jid ${job_name})
+            if [[ -n ${jid} ]]; then
+                step_para="-W depend=afterany:${jid}"
+            fi
+        fi
         ((mpi = node / omp))
         cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}' \
+            ${step_para} \
             -N ${job_name} \
             -l 'walltime=${time}' \
-            -v log=${log} \
+            -v "log=${log},initial_runi=${initial_runi},queue=${queue}" \
             ${script}"
         echo $cmd
-        eval $cmd
     elif [[ ${queue} == small ]]; then
         if [[ $is_step == true ]]; then
             step_para="--step --sparam 'jnam=${job_name}'"
