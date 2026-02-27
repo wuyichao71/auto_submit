@@ -29,6 +29,7 @@ function main() {
         # get cpu number (mpi * omp)
         cpu=$(extract "CPU cores" $file)
         node=0
+        queue=""
         # if on tsubame, set queue dependent on gpu card type and gpu card number
         if [[ "x$HOSTNAME" == "xlogin"* ]]; then
             gpu_model="$(grep 'gpu model' $file)"
@@ -39,7 +40,11 @@ function main() {
                     queue="node_q"
                 elif [[ $gpu -eq 2 ]]; then
                     queue="node_h"
+                elif [[ $gpu -eq 4 ]]; then
+                    queue="node_f"
                 fi
+            else
+                queue="cpu_${cpu}"
             fi
         elif [[ "x$HOSTNAME" == "xcell" ]]; then
             queue=$(extract 'exec. host' $file)

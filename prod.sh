@@ -290,8 +290,10 @@ function find_initial_runi() {
 
 function is_normal_mode() {
     # check whether the job is in normal mode
-    local mode=$(pjstat --data --filter "jnam=$1" | grep '^,' | awk -F, '{print $4}')
-    [[ "x$mode" == "xNM" ]] && return 0
+    if [[ "$queue" == small ]]; then
+        local mode=$(pjstat --data --filter "jnam=$1" | grep '^,' | awk -F, '{print $4}')
+        [[ "x$mode" == "xNM" ]] && return 0
+    fi
     return 1
 }
 
@@ -353,6 +355,7 @@ EOF
 
 function submit_repi() {
     log=log/stdout
+    step_para=""
     # helix kinase
     if [[ ${queue} =~ (helix|kinase) ]]; then
         cmd="qsub \
@@ -373,7 +376,12 @@ function submit_repi() {
         echo $cmd
     # tsubame
     elif [[ ${queue} =~ (gpu_.|node.|cpu_.*) ]]; then
-        cmd="qsub -cwd -l 'h_rt=${time}' \
+        if [[ $is_step == true ]]; then
+            step_para="-hold_jid ${job_name}"
+        fi
+        cmd="qsub -cwd \
+            ${step_para} \
+            -l 'h_rt=${time}' \
             -g $(groups | awk '{print $NF}') \
             -l '${queue}=${node}' \
             -o ${log} \
@@ -394,7 +402,6 @@ function submit_repi() {
         echo $cmd
         eval $cmd
     elif [[ ${queue} == small ]]; then
-        step_para=""
         if [[ $is_step == true ]]; then
             step_para="--step --sparam 'jnam=${job_name}'"
         fi
