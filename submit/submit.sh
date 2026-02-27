@@ -126,7 +126,6 @@ function main () {
                 NEXT["$name"]=$(( now + INTERVAL[$name]  ))
             fi
         done
-        break
 
         sleep 5
     done
