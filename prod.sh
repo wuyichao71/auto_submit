@@ -11,12 +11,14 @@ function submit_config() {
     mpiexec=mpiexec
     local=/home/wuyichao/Documents/software/genesis-2.1.6.1
     tsubame_local=/home/2/uj02562/data/software/genesis-2.1.6.1
+    fugakupost_local=/home/u12262/data3/software/genesis-2.1.6.1
     # beta and serine
     if [[ "x${SLURMD_NODENAME}" =~ x(beta|serine) ]]; then
-        mpi=24
+        ncpu=24
         export OMP_NUM_THREADS=1
         spdyn=${local}/bin/spdyn-mixed-intel-cuda12-${SLURMD_NODENAME}
         source ${local}/setup-mixed-intel-cuda12-${SLURMD_NODENAME}.sh
+        ((mpi = ncpu / omp))
         return
     fi
     # tsubame
@@ -69,6 +71,28 @@ function submit_config() {
         source /vol0004/apps/oss/spack/share/spack/setup-env.sh
         spack load /46ohljh # genesis#2.1.6.1 mixed
         spdyn=spdyn
+        return
+    fi
+    # fugaku post gpu[12]
+    if [[ "x${SLURM_JOB_PARTITION}" =~ xgpu[12] ]]; then
+        ncpu=${SLURM_CPUS_PER_TASK:-36}
+        export OMP_NUM_THREADS=${omp}
+        (( openmp = OMP_NUM_THREADS ))
+        suffix=cuda12-intel-mixed-fugakupost
+        spdyn=${fugakupost_local}/bin/spdyn-${suffix}
+        source ${fugakupost_local}/setup-${suffix}.sh
+        ((mpi = ncpu / openmp))
+        return
+    fi
+    # fugaku post mem[12]
+    if [[ "x${SLURM_JOB_PARTITION}" =~ xmem[12] ]]; then
+        ncpu=${SLURM_CPUS_PER_TASK:-48}
+        export OMP_NUM_THREADS=${omp}
+        (( openmp = OMP_NUM_THREADS ))
+        suffix=intel-mixed-fugakupost
+        spdyn=${fugakupost_local}/bin/spdyn-${suffix}
+        source ${fugakupost_local}/setup-${suffix}.sh
+        ((mpi = ncpu / openmp))
         return
     fi
 }
@@ -221,9 +245,9 @@ function get_job_name() {
             job_name_list+=($_name)
         done
     # beta serine
-    elif [[ $queue =~ (beta|serine) ]]; then
-        job_name_list=($(squeue -o '%j' | tail -n+2))
-        job_id_list=($(squeue -o '%i' | tail -n+2))
+    elif [[ $queue =~ (beta|serine|(gpu|mem)[12]) ]]; then
+        job_name_list=($(squeue --me -o '%j' | tail -n+2))
+        job_id_list=($(squeue  --me -o '%i' | tail -n+2))
     # ims
     elif [[ $queue =~ ims ]]; then
         job_name_list=($(jobinfo -c |grep -v '^[-Q]' |awk '{print $3}'))
@@ -382,14 +406,35 @@ function submit_repi() {
             -e ${log} \
             -o ${log} \
             -N ${job_name} \
-            -v 'initial_runi=${initial_runi},omp=${omp}' \
+            -v 'initial_runi=${initial_runi},omp=${omp},queue=${queue}' \
             ${script}"
         echo $cmd
     elif [[ ${queue} == cell ]]; then
         cmd="echo 'hello, world'"
     # beta serine
-    elif [[ ${queue} =~ (beta|serine) ]]; then
-        cmd="sbatch -p ${queue} -o ${log} -e ${log} --cpus-per-task=${node} -J ${job_name} ${script}"
+    elif [[ ${queue} =~ (beta|serine|(gpu|mem)[12]) ]]; then
+        gpu_para=""
+        mem_para=""
+        time_para=""
+        if [[ ${queue} =~ gpu[12] ]]; then
+            gpu_para="--gpus-per-node=1"
+            mem_para="--mem 32G"
+            time_para="-t ${time}"
+        fi
+        if [[ ${queue} =~ mem[12] ]]; then
+            mem_para="--mem 32G"
+            time_para="-t ${time}"
+        fi
+        cmd="sbatch -p ${queue} \
+            --export='initial_runi=${initial_runi},omp=${omp},queue=${queue}' \
+            ${gpu_para} \
+            ${mem_para} \
+            ${time_para} \
+            -o ${log} \
+            -e ${log} \
+            --cpus-per-task=${node} \
+            -J ${job_name} \
+            ${script}"
         echo $cmd
     # tsubame
     elif [[ ${queue} =~ (gpu_.|node.|cpu_.*) ]]; then
@@ -502,6 +547,8 @@ Options:
   -o, --omp         OpenMP number (default: 1)
   -t, --time        Elapse limit time (default: 24:00:00)
   -l, --n_loop N    Number of loops (default: 1)
+  --nstep           MD steps (default: 60000)
+  --crdout_period   Coordination output period (defalut: 3000)
   --slient          Slient mode
   -h, --help        Show this help message and exit
 
@@ -524,6 +571,7 @@ EOF
 
 # set_config function
 function set_config() {
+    conf_name=default.conf
     inpname_list=(prod.inp)
     submit_dir="submit_script"
     submit_name='sub-${runi_ini}-${runi_end}.sh'
@@ -543,8 +591,6 @@ function set_config() {
     input[reffile]=../data/initial_min.pdb
     input[nsteps]=600000
     input[crdout_period]=3000
-    input[eneout_period]=${input["crdout_period"]}
-    input[rstout_period]=${input["nsteps"]}
     box_length=($(grep "^CRYST1" ../../data/homo-${type}/initial_equ.pdb | awk '{print $2,$3,$4}'))
     input[initial_box_size]=$(cat <<EOF
 box_size_x = ${box_length[0]}
@@ -623,8 +669,7 @@ EOF
     )
 
     set_submit_parameter
-    [[ -f para ]] && set -a && source para && set +a
-    [[ -f para.${queue} ]] && set -a && source para.${queue} && set +a
+    [[ -f "${conf_name}" ]] && set -a && source "${conf_name}" && set +a
     is_submit=false
     is_step=false
     is_slient=false
@@ -653,6 +698,14 @@ EOF
                 ;;
             -t|--time)
                 time=$2
+                shift 2
+                ;;
+            --nsteps)
+                input[nsteps]=$2
+                shift 2
+                ;;
+            --crdout_period)
+                input[crdout_period]=$2
                 shift 2
                 ;;
             --slient)
@@ -690,6 +743,8 @@ EOF
     if [[ ${is_slient} == false ]]; then
         echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, queue=${queue}, node=${node}, omp=${omp}, time=${time}, is_submit=${is_submit}, is_step=${is_step}"
     fi
+    input[eneout_period]=${input["crdout_period"]}
+    input[rstout_period]=${input["nsteps"]}
     setup_directory
 }
 

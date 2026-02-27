@@ -15,6 +15,15 @@ elif [[ $name == *tsubame* ]]; then
         module load cuda/12.8.0
     fi
     njob=32
+elif [[ $name == *fugakupost* ]]; then
+    if [[ $name == *intel* ]]; then
+        source /opt/intel/oneapi/setvars.sh intel64
+    fi
+    if [[ $name == *cuda12* ]]; then
+        export LD_LIBRARY_PATH=/usr/local/cuda-12.8/lib64:$LD_LIBRARY_PATH
+        export PATH=/usr/local/cuda-12.8/bin:$PATH
+    fi
+    njob=72
 else
     if [[ $name == *intel* ]]; then
         source /home/appl/intel/oneapi/setvars.sh
@@ -55,6 +64,8 @@ if ! [[ -e $spdyn ]]; then
             FC=mpiifx CC=mpiicx CXX=mpiicpx LAPACK_LIBS=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl" ./configure --program-suffix="-${suffix}" "${mixed}" "${gpu}"
         elif [[ $name == *ims* ]]; then
             FC=mpif90 CC=mpicc LAPACK_LIBS=" -L${MKLROOT}/lib/intel64 -Wl,--no-as-needed -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp -lpthread -lm -ldl" ./configure --program-suffix="-${suffix}" "${mixed}" "${gpu}"
+        elif [[ $name == *fugakupost* ]]; then
+            FC=mpiifx CC=mpiicx CXX=mpiicpx ./configure --program-suffix="-${suffix}" "$mixed" "$gpu"
         else
             ./configure --program-suffix="-${suffix}" "$mixed" "$gpu"
         fi
