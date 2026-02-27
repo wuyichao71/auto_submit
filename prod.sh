@@ -232,10 +232,12 @@ function get_job_name() {
         job_name_list=($(pjstat --data |grep '^,' |awk -F, '{print $3}'))
         job_id_list=($(pjstat --data |grep '^,' |awk -F, '{print $2}'))
     fi
-    for idx in "${!job_name_list[@]}"
-    do
-        echo "${job_id_list[$idx]} --> ${job_name_list[$idx]}"
-    done
+    if [[ ${is_slient} == false ]]; then
+        for idx in "${!job_name_list[@]}"
+        do
+            echo "${job_id_list[$idx]} --> ${job_name_list[$idx]}"
+        done
+    fi
 }
 
 function find_ini_exist_runi() {
@@ -499,6 +501,7 @@ Options:
   -o, --omp         OpenMP number (default: 1)
   -t, --time        Elapse limit time (default: 24:00:00)
   -l, --n_loop N    Number of loops (default: 1)
+  --slient          Slient mode
   -h, --help        Show this help message and exit
 
 Behavior:
@@ -623,6 +626,7 @@ EOF
     [[ -f para.${queue} ]] && set -a && source para.${queue} && set +a
     is_submit=false
     is_step=false
+    is_slient=false
     positional=()
     while [[ $# -gt 0 ]]
     do
@@ -649,6 +653,10 @@ EOF
             -t|--time)
                 time=$2
                 shift 2
+                ;;
+            --slient)
+                is_slient=true
+                shift
                 ;;
             -h|--help)
                 usage; exit 0 ;;
@@ -678,7 +686,9 @@ EOF
     fi
 
     update_queue
-    echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, queue=${queue}, node=${node}, omp=${omp}, time=${time}, is_submit=${is_submit}, is_step=${is_step}"
+    if [[ ${is_slient} == false ]]; then
+        echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, queue=${queue}, node=${node}, omp=${omp}, time=${time}, is_submit=${is_submit}, is_step=${is_step}"
+    fi
     setup_directory
 }
 
