@@ -223,6 +223,7 @@ function get_job_name() {
     # beta serine
     elif [[ $queue =~ (beta|serine) ]]; then
         job_name_list=($(squeue -o '%j' | tail -n+2))
+        job_id_list=($(squeue -o '%i' | tail -n+2))
     # ims
     elif [[ $queue =~ ims ]]; then
         job_name_list=($(jobinfo -c |grep -v '^[-Q]' |awk '{print $3}'))
