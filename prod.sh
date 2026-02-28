@@ -60,8 +60,13 @@ function submit_config() {
           cd ${PBS_O_WORKDIR}
         fi
         module -s purge
-        module load genesis/2.1.4
-        spdyn=/lustre/home/users/fen/software/genesis-2.1.6.1/bin/spdyn-mixed-ims
+        if (( ${gpu} == 0 )); then
+            module load genesis/2.1.4
+            spdyn=/home/users/fen/software/genesis-2.1.6.1/bin/spdyn-mixed-ims
+        else
+            module load genesis/2.1.4-CUDA
+            spdyn=/home/users/fen/software/genesis-2.1.6.1/bin/spdyn-cuda12-mixed-ims
+        fi
         return
     fi
     # fugaku
