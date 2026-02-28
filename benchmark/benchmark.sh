@@ -49,6 +49,7 @@ function main() {
                 fi
                 ;;
         esac
+        echo 1
         if [[ "x$HOSTNAME" == "xlogin"* ]]; then
             gpu_model="$(grep 'gpu model' $file)"
             if [[ "x${gpu_model}" == "x"*"NVIDIA H100 MIG 3g.47gb (CC 9.0)"* ]]; then
