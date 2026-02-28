@@ -15,7 +15,7 @@ function submit_config() {
     # beta and serine
     if [[ "x${SLURMD_NODENAME}" =~ x(beta|serine) ]]; then
         ncpu=24
-        export OMP_NUM_THREADS=1
+        export OMP_NUM_THREADS=${omp}
         spdyn=${local}/bin/spdyn-mixed-intel-cuda12-${SLURMD_NODENAME}
         source ${local}/setup-mixed-intel-cuda12-${SLURMD_NODENAME}.sh
         ((mpi = ncpu / omp))
