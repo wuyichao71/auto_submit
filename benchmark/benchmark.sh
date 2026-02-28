@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -eu
+set -u
 
 function set_config() {
     repi_ini=1
@@ -17,6 +17,7 @@ function main() {
     declare -A count
     for file in $(ls -hv */run*/prod/out.1.0)
     do
+        echo $file
         # get version
         version=$(extract 'version' $file)
         # get precision
@@ -36,6 +37,20 @@ function main() {
         # if on tsubame, set queue dependent on gpu card type and gpu card number
         case "${HOSTNAME}" in
             login*)
+                gpu_model="$(grep 'gpu model' $file)"
+                if [[ "x${gpu_model}" == "x"*"NVIDIA H100 MIG 3g.47gb (CC 9.0)"* ]]; then
+                    queue="node_o"
+                elif [[ "x${gpu_model}" == "x"*"NVIDIA H100 (CC 9.0)"* ]]; then
+                    if [[ $gpu -eq 1 ]]; then
+                        queue="node_q"
+                    elif [[ $gpu -eq 2 ]]; then
+                        queue="node_h"
+                    elif [[ $gpu -eq 4 ]]; then
+                        queue="node_f"
+                    fi
+                else
+                    queue="cpu_${cpu}"
+                fi
                 ;;
             cell)
                 ;;
@@ -49,23 +64,7 @@ function main() {
                 fi
                 ;;
         esac
-        echo 1
-        if [[ "x$HOSTNAME" == "xlogin"* ]]; then
-            gpu_model="$(grep 'gpu model' $file)"
-            if [[ "x${gpu_model}" == "x"*"NVIDIA H100 MIG 3g.47gb (CC 9.0)"* ]]; then
-                queue="node_o"
-            elif [[ "x${gpu_model}" == "x"*"NVIDIA H100 (CC 9.0)"* ]]; then
-                if [[ $gpu -eq 1 ]]; then
-                    queue="node_q"
-                elif [[ $gpu -eq 2 ]]; then
-                    queue="node_h"
-                elif [[ $gpu -eq 4 ]]; then
-                    queue="node_f"
-                fi
-            else
-                queue="cpu_${cpu}"
-            fi
-        elif [[ "x$HOSTNAME" == "xcell" ]]; then
+        if [[ "x$HOSTNAME" == "xcell" ]]; then
             queue=$(extract 'exec. host' $file)
             if [[ "x${queue}" == "xu"* ]]; then
                 continue
