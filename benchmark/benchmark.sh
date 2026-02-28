@@ -55,6 +55,12 @@ function main() {
             queue=${queue%.*}
         elif [[ "x$HOSTNAME" == xfn*sv* ]]; then
             ((node = cpu / 48))
+            host_info=$(extract 'exec. host' $file)
+            if [[ "${host_info}" =~ u.*@.+ ]]; then
+                queue=small
+            elif [[ "${host_info}" == u*@ ]]; then
+                queue=gpu1
+            fi
         fi
 
         # if gpu is empty, set to zero

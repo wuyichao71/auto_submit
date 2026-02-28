@@ -24,6 +24,7 @@ def convert_value(x: str):
 
 
 def plot_line(benchmark):
+    benchmark = [d for d in benchmark if d['node'] != 0]
     plot_data = {}
     omp_set = set(d['omp'] for d in benchmark)
     for omp in sorted(omp_set):
@@ -44,11 +45,10 @@ def plot_line(benchmark):
     plt.xlabel('# of node')
     plt.ylabel('benchmark [ns/day]')
     plt.xscale('log', base=2)
-    plt.yscale('log', base=10, subs=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+    plt.yscale('log', base=10)
 
 
 def plot_bar(benchmark):
-
     # tsubame
     if 'login' in os.uname().nodename:
         labels = [f"{b['queue']} (m{b['mpi']}o{b['omp']})" for b in benchmark]
