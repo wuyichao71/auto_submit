@@ -59,7 +59,8 @@ function submit_config() {
         if [ ! -z "${PBS_O_WORKDIR}" ]; then
           cd ${PBS_O_WORKDIR}
         fi
-        source ~/software/genesis-2.1.6.1/setup-mixed-ims.sh
+        module -s purge
+        module load genesis/2.1.4
         spdyn=/lustre/home/users/fen/software/genesis-2.1.6.1/bin/spdyn-mixed-ims
         return
     fi
@@ -417,7 +418,8 @@ function submit_repi() {
         mem_para=""
         time_para=""
         if [[ ${queue} =~ gpu[12] ]]; then
-            gpu_para="--gpus-per-node=1"
+            [[ ${gpu} -eq 0 ]] && gpu=1
+            gpu_para="--gpus-per-node=${gpu}"
             mem_para="--mem 32G"
             time_para="-t ${time}"
         fi
@@ -459,8 +461,12 @@ function submit_repi() {
                 step_para="-W depend=afterany:${jid}"
             fi
         fi
+        gpu_para=""
+        if [[ $gpu -ne 0 ]]; then
+            gpu_para=":ngpus=${gpu}"
+        fi
         ((mpi = node / omp))
-        cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}' \
+        cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}${gpu_para}' \
             ${step_para} \
             -N ${job_name} \
             -l 'walltime=${time}' \
@@ -545,6 +551,7 @@ Options:
   -q, --queue       Queue name
   -n, --node        Node number (default: 1)
   -o, --omp         OpenMP number (default: 1)
+  -g, --gpu         GPU number (default: 0)
   -t, --time        Elapse limit time (default: 24:00:00)
   -l, --n_loop N    Number of loops (default: 1)
   --nstep           MD steps (default: 60000)
@@ -577,6 +584,7 @@ function set_config() {
     submit_name='sub-${runi_ini}-${runi_end}.sh'
     omp=1
     node=1
+    gpu=0
     time=24:00:00
 
     job_head="homo"
@@ -696,6 +704,10 @@ EOF
                 omp=$2
                 shift 2
                 ;;
+            -g|--gpu)
+                gpu=$2
+                shift 2
+                ;;
             -t|--time)
                 time=$2
                 shift 2
@@ -741,7 +753,7 @@ EOF
 
     update_queue
     if [[ ${is_slient} == false ]]; then
-        echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, queue=${queue}, node=${node}, omp=${omp}, time=${time}, is_submit=${is_submit}, is_step=${is_step}"
+        echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, queue=${queue}, node=${node}, omp=${omp}, gpu=${gpu}, time=${time}, is_submit=${is_submit}, is_step=${is_step}"
     fi
     input[eneout_period]=${input["crdout_period"]}
     input[rstout_period]=${input["nsteps"]}

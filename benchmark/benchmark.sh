@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+set -eu
 
 function set_config() {
     repi_ini=1
@@ -22,6 +23,8 @@ function main() {
         precision=$(extract 'precision' $file)
         # get gpu card number
         gpu=$(extract '# of GPUs' $file)
+        # if gpu is empty, set to zero
+        gpu=${gpu:-0}
         # get mpi number
         mpi=$(extract 'MPI proc' $file)
         # get openmp number
@@ -31,6 +34,21 @@ function main() {
         node=0
         queue=""
         # if on tsubame, set queue dependent on gpu card type and gpu card number
+        case "${HOSTNAME}" in
+            login*)
+                ;;
+            cell)
+                ;;
+            fn*sv*)
+                ;;
+            *ims*)
+                if [[ ${gpu} -eq 0 ]]; then
+                    queue=ims_cpu
+                else
+                    queue=ims_gpu
+                fi
+                ;;
+        esac
         if [[ "x$HOSTNAME" == "xlogin"* ]]; then
             gpu_model="$(grep 'gpu model' $file)"
             if [[ "x${gpu_model}" == "x"*"NVIDIA H100 MIG 3g.47gb (CC 9.0)"* ]]; then
@@ -63,14 +81,13 @@ function main() {
             fi
         fi
 
-        # if gpu is empty, set to zero
-        gpu=${gpu:-0}
         # get total time
         total_time=$(extract 'total time' $file)
         # if total time is empty, skip this part
         if [[ -n "${total_time}" ]]; then
             key="queue=${queue},version=${version},precision=${precision},node=${node},gpu=${gpu},cpu=${cpu},mpi=${mpi},omp=${omp}"
             time_sum[$key]=$(bc <<<"${time_sum[$key]:-0} + ${total_time}")
+            count[$key]=${count[$key]:-0}
             ((count[$key] += 1))
         fi
     done
