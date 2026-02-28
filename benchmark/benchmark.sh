@@ -48,6 +48,9 @@ function main() {
             fi
         elif [[ "x$HOSTNAME" == "xcell" ]]; then
             queue=$(extract 'exec. host' $file)
+            if [[ "x${queue}" == "xu"* ]]; then
+                continue
+            fi
             queue=${queue#*@}
             queue=${queue%.*}
         elif [[ "x$HOSTNAME" == xfn*sv* ]]; then
