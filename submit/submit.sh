@@ -69,6 +69,9 @@ function load_targets() {
         # now task, initialize NEXT
         if [[ -z "${NEXT[$name]+x}" ]]; then
             NEXT["$name"]="$(now_epoch)"
+        # if interval is different, initialize NEXT
+        elif [[ NEW_INTERVAL[$name] -ne INTERVAL[$name] ]]; then
+            NEXT["$name"]="$(now_epoch)"
         fi
     done
 
@@ -132,12 +135,3 @@ function main () {
 }
 
 main
-
-# abltide_tsubame_dir="/home/2/uj02562/data/abltide/production/highfold2_cyclic/cyclic-2/3_prod"
-# igf1r_tsubame_dir="/home/2/uj02562/data/igf1r/prod/cmd-homo-dm"
-# while true
-# do
-#     ssh -X tsubame "cd ${abltide_tsubame_dir} && source /etc/profile.d/zT4.sh && bash sub_prod.sh yes"
-#     ssh -X tsubame "cd ${igf1r_tsubame_dir} && source /etc/profile.d/zT4.sh && bash prod.sh --slient 8 20 -q node_o -t 19:00:00 -l 2 -y"
-#     sleep 4h
-# done
