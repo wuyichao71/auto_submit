@@ -368,6 +368,7 @@ function generate_script() {
 #PBS -j oe
 echo "queue=\${queue}"
 echo "omp=\${omp}"
+echo "gpu=\${gpu}"
 echo "initial_runi=\${initial_runi}"
 initial_runi=${initial_runi}
 $(declare -p input)
@@ -402,7 +403,7 @@ function submit_repi() {
     if [[ ${queue} =~ (helix|kinase) ]]; then
         cmd="qsub \
             -cwd \
-            -pe mpi ${node} \
+            -pe mpi ${cpu} \
             -q ${queue} \
             -e ${log} \
             -o ${log} \
@@ -434,7 +435,7 @@ function submit_repi() {
             ${time_para} \
             -o ${log} \
             -e ${log} \
-            --cpus-per-task=${node} \
+            --cpus-per-task=${cpu} \
             -J ${job_name} \
             ${script}"
         echo $cmd
@@ -465,12 +466,12 @@ function submit_repi() {
         if [[ $gpu -ne 0 ]]; then
             gpu_para=":ngpus=${gpu}"
         fi
-        ((mpi = node / omp))
-        cmd="jsub -l 'select=1:ncpus=${node}:mpiprocs=${mpi}:ompthreads=${omp}${gpu_para}' \
+        ((mpi = cpu / omp))
+        cmd="jsub -l 'select=${node}:ncpus=${cpu}:mpiprocs=${mpi}:ompthreads=${omp}${gpu_para}' \
             ${step_para} \
             -N ${job_name} \
             -l 'walltime=${time}' \
-            -v "log=${log},initial_runi=${initial_runi},queue=${queue}" \
+            -v 'log=${log},initial_runi=${initial_runi},queue=${queue},omp=${omp},gpu=${gpu}' \
             ${script}"
         echo $cmd
     elif [[ ${queue} == small ]]; then
@@ -487,7 +488,7 @@ function submit_repi() {
             -L 'elapse=${time}' \
             -x 'PJM_LLIO_GFSCACHE=/vol0004:/vol0005:/vol0003' \
             -N ${job_name} \
-            -x 'initial_runi=${initial_runi}' \
+            -x 'initial_runi=${initial_runi},queue=${queue},omp=${omp}' \
             -o ${log} \
             -e ${log} \
             ${script}"
@@ -550,6 +551,7 @@ Options:
   -s, --step        Enable step mode
   -q, --queue       Queue name
   -n, --node        Node number (default: 1)
+  -c, --cpu         CPU process number (default=node)
   -o, --omp         OpenMP number (default: 1)
   -g, --gpu         GPU number (default: 0)
   -t, --time        Elapse limit time (default: 24:00:00)
@@ -582,8 +584,9 @@ function set_config() {
     inpname_list=(prod.inp)
     submit_dir="submit_script"
     submit_name='sub-${runi_ini}-${runi_end}.sh'
-    omp=1
     node=1
+    omp=1
+    cpu=0
     gpu=0
     time=24:00:00
 
@@ -700,6 +703,10 @@ EOF
                 node=$2
                 shift 2
                 ;;
+            -c|--cpu)
+                cpu=$2
+                shift 2
+                ;;
             -o|--omp)
                 omp=$2
                 shift 2
@@ -750,10 +757,11 @@ EOF
             usage; exit 1;
         fi
     fi
+    (( cpu == 0 )) && (( cpu = node ))
 
     update_queue
     if [[ ${is_slient} == false ]]; then
-        echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, queue=${queue}, node=${node}, omp=${omp}, gpu=${gpu}, time=${time}, is_submit=${is_submit}, is_step=${is_step}"
+        echo "repi_ini=${repi_ini}, repi_end=${repi_end}, input[n_loop]=${input[n_loop]}, queue=${queue}, node=${node}, cpu=${cpu}, omp=${omp}, gpu=${gpu}, time=${time}, is_submit=${is_submit}, is_step=${is_step}"
     fi
     input[eneout_period]=${input["crdout_period"]}
     input[rstout_period]=${input["nsteps"]}
