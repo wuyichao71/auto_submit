@@ -70,7 +70,10 @@ function load_targets() {
         if [[ -z "${NEXT[$name]+x}" ]]; then
             NEXT["$name"]="$(now_epoch)"
         # if interval is different, initialize NEXT
-        elif [[ NEW_INTERVAL[$name] -ne INTERVAL[$name] ]]; then
+        elif [[ ${NEW_INTERVAL[$name]} -ne ${INTERVAL[$name]} ]]; then
+            NEXT["$name"]="$(now_epoch)"
+        # if cmd is different, initialize NEXT
+        elif [[ "${NEW_CMD[$name]}" != "${CMD[$name]}" ]]; then
             NEXT["$name"]="$(now_epoch)"
         fi
     done
