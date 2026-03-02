@@ -434,7 +434,7 @@ function submit_repi() {
             time_para="-t ${time}"
         fi
         cmd="sbatch -p ${queue} \
-            --export='initial_runi=${initial_runi},omp=${omp},queue=${queue}' \
+            --export='initial_runi=${initial_runi},omp=${omp},queue=${queue},gpu=${gpu}' \
             ${gpu_para} \
             ${mem_para} \
             ${time_para} \
