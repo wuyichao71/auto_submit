@@ -45,7 +45,7 @@ function submit_config() {
     # kinase and helix
     if [[ "x${HOSTNAME}" == "x"*".local" ]]; then
         ncpu=${NSLOTS:-$(nproc)}
-        export OMP_NUM_THREADS=1
+        export OMP_NUM_THREADS=${omp}
         openmp=${OMP_NUM_THREADS}
         ((mpi = ncpu / openmp))
         spdyn=${local}/bin/spdyn-mixed-intel-cuda12
