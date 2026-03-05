@@ -150,7 +150,6 @@ EOF
 function set_config() {
     repi_ini=1
     repi_end=20
-    max_runi=250
     dir=conv
     inp_head=prod
     psffile=../../data/step3_input.psf
