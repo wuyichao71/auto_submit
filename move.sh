@@ -21,12 +21,13 @@ function move() {
         do
             dcd="${repi}/run${runi}/${head}${runi}.dcd"
             conv_dcd="${repi}/run${runi}/${conv_dir}/${conv_head}${runi}.dcd"
+            echo "${dcd}"
             if [[ -e "$conv_dcd" ]] && full_dcd "${conv_dcd}"; then
                 if [[ -e "${dcd}" ]]; then
                     full_path="$(pwd)/${dcd}"
                     trash_path=${full_path/data3/trash2}
                     mkdir -p "$(dirname ${trash_path})"
-                    mv ${full_path} ${trash_path}
+                    mv -v ${full_path} ${trash_path}
                 fi    
             else
                 break
