@@ -135,8 +135,9 @@ function submit_main() {
 }
 
 function generate_inp() {
-    for inpname in "${inpname_list[@]}"
+    for idx in "${!inpname_list[@]}"
     do
+        inpname="${inpname_list[$idx]}"
         echo "Generate ${target_dir}/${inpname}"
         head=$(basename ${inpname} .inp)
         out_dcdfile=${head}${runi}.dcd
@@ -220,9 +221,15 @@ function submit_check_full() {
     do
         head=$(basename ${inpname} .inp)
         dcd=${head}${runi}.dcd
+        conv_dcd="${input[conv_dir]}/${input[conv_head]}${runi}.dcd"
+        # echo ${conv_dcd}
         rst=${head}${runi}.rst
         out=${head}/out.1.0
-        [[ -e "$dcd" ]] && full_dcd "$dcd" || return 1
+        if [[ -e "$dcd" ]]; then
+            full_dcd "$dcd" || return 1
+        else
+            [[ -e "${conv_dcd}" ]] && full_dcd "$conv_dcd" || return 1
+        fi
         [[ -e "$rst" ]] && full_rst "$rst" || return 1
         [[ -e "$out" ]] && full_out "$out" || return 1
     done
@@ -299,10 +306,15 @@ function check_full() {
         head=$(basename ${inpname} .inp)
         run_dir="run${initial_runi}"
         dcd=${run_dir}/${head}${initial_runi}.dcd
+        conv_dcd="${run_dir}/${input[conv_dir]}/${input[conv_head]}${initial_runi}.dcd"
         rst=${run_dir}/${head}${initial_runi}.rst
         out=${run_dir}/${head}/out.1.0
         [[ -d $run_dir ]] || return 1
-        [[ -e "$dcd" ]] && full_dcd "$dcd" || return 1
+        if [[ -e "$dcd" ]]; then
+            full_dcd "$dcd" || return 1
+        else
+            [[ -e "${conv_dcd}" ]] && full_dcd "$conv_dcd" || return 1
+        fi
         [[ -e "$rst" ]] && full_rst "$rst" || return 1
         [[ -e "$out" ]] && full_out "$out" || return 1
     done
@@ -607,6 +619,8 @@ function set_config() {
     input[reffile]=../data/initial_min.pdb
     input[nsteps]=600000
     input[crdout_period]=3000
+    input[conv_dir]=conv
+    input[conv_head]=conv
     box_length=($(grep "^CRYST1" ../../data/homo-${type}/initial_equ.pdb | awk '{print $2,$3,$4}'))
     input[initial_box_size]=$(cat <<EOF
 box_size_x = ${box_length[0]}
@@ -701,10 +715,12 @@ EOF
                 shift 2
                 ;;
             -q|--queue)
+                [[ $# -ge 2 ]] || { echo "Error: --queue needs a value"; exit 1; }
                 queue=$2
                 shift 2
                 ;;
             -n|--node)
+                [[ $# -ge 2 ]] || { echo "Error: --node needs a value"; exit 1; }
                 node=$2
                 shift 2
                 ;;
