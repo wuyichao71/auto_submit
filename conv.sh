@@ -10,6 +10,14 @@ function run() {
             local trjname="${repi}/run${runi}/${inp_head}${runi}.dcd"
             if [[ -e ${trjname} ]]; then
                 full_dcd ${trjname} || break
+            else
+                for idx in "${!inpname_list[@]}"
+                do
+                    inpname="${inpname_list[$idx]}"
+                    out_head=$(basename "${inpname}" .inp)
+                    out_trjfile="${repi}/run${runi}/${dir}/${out_head}${runi}.dcd"
+                    [[ -e "${out_trjfile}" ]] || break 2
+                done
             fi
             conv "${trjname}"
             ((runi++))
