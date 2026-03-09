@@ -8,7 +8,9 @@ function run() {
         while (( max_runi < 0 || runi <= max_runi))
         do
             local trjname="${repi}/run${runi}/${inp_head}${runi}.dcd"
-            [[ -e ${trjname} ]] && full_dcd ${trjname} || break
+            if [[ -e ${trjname} ]]; then
+                full_dcd ${trjname} || break
+            fi
             conv "${trjname}"
             ((runi++))
         done
