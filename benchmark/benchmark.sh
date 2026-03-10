@@ -77,7 +77,7 @@ function main() {
             if [[ "${host_info}" =~ u.*@.+ ]]; then
                 queue=small
             elif [[ "${host_info}" == u*@ ]]; then
-                queue=gpu1
+                queue=gpu2
             fi
         fi
 
